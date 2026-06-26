@@ -209,6 +209,7 @@ h2::after {
   filter: drop-shadow(4px 4px 0px rgba(0,0,0,0.8));
   user-select: none;
   -webkit-user-drag: none;
+  -moz-user-drag: none;
   background-image: url("../img/cosmetics/jerry.png");
   background-size: contain;
   background-repeat: no-repeat;
