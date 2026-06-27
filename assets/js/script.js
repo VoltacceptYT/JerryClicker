@@ -1199,7 +1199,7 @@ function showFrenzyTimer(seconds) {
     runInternal(() => {
       remaining--;
       const secEl = document.getElementById("frenzy-timer-secs");
-      if (secEl) secEl.textContent = remaining + "s";
+      if (secEl) secEl.textContent = remaining;
       if (remaining <= 0) {
         clearInterval(tick);
         const timerEl = document.getElementById("frenzy-timer");
