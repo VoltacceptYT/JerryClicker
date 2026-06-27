@@ -665,3 +665,167 @@ button:disabled {
     max-height: none;
   }
 }
+
+/* ── Golden Jerry ─────────────────────────────────────────── */
+#golden-jerry {
+  position: fixed;
+  width: 80px;
+  height: 80px;
+  background-image: url("../img/powerups/golden_jerry.png");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  image-rendering: pixelated;
+  cursor: url("../img/ui/cursors/pointer.png"), pointer;
+  z-index: 9000;
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(0.5) translateY(0px);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+  filter:
+    drop-shadow(0 0 6px #FFD700)
+    drop-shadow(0 0 14px #FFB300)
+    drop-shadow(0 0 28px rgba(255, 200, 0, 0.5))
+    brightness(1.25)
+    sepia(0.3)
+    saturate(1.8);
+  animation: none;
+}
+
+#golden-jerry.golden-jerry-visible {
+  pointer-events: auto;
+  opacity: 1;
+  transform: scale(1) translateY(0px);
+  animation: goldenJerryBob 1.4s ease-in-out infinite;
+}
+
+#golden-jerry:hover {
+  filter:
+    drop-shadow(0 0 10px #FFD700)
+    drop-shadow(0 0 22px #FFB300)
+    drop-shadow(0 0 40px rgba(255, 200, 0, 0.7))
+    brightness(1.45)
+    sepia(0.2)
+    saturate(2.2);
+  transform: scale(1.12) translateY(-4px) !important;
+  animation: none !important;
+}
+
+#golden-jerry.golden-jerry-fade {
+  opacity: 0;
+  transform: scale(0.7) translateY(-20px);
+  pointer-events: none;
+  transition: opacity 0.4s ease, transform 0.4s ease;
+  animation: none;
+}
+
+#golden-jerry.golden-jerry-burst {
+  opacity: 0;
+  transform: scale(1.6) translateY(-10px);
+  pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  animation: none;
+  filter: drop-shadow(0 0 20px #FFD700) drop-shadow(0 0 40px #FFF) brightness(2);
+}
+
+@keyframes goldenJerryBob {
+  0%,100% { transform: scale(1) translateY(0px); }
+  25%      { transform: scale(1.04) translateY(-6px) rotate(2deg); }
+  75%      { transform: scale(0.97) translateY(3px) rotate(-1.5deg); }
+}
+
+/* Shimmer ring behind the Golden Jerry */
+#golden-jerry.golden-jerry-visible::before {
+  content: "";
+  position: absolute;
+  inset: -14px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,215,0,0.18) 30%, transparent 70%);
+  animation: goldenPulse 1.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes goldenPulse {
+  0%,100% { opacity: 0.6; transform: scale(1); }
+  50%      { opacity: 1;   transform: scale(1.12); }
+}
+
+/* ── Frenzy overlay & timer ───────────────────────────────── */
+body.frenzy-active {
+  outline: 4px solid #FFD700;
+  outline-offset: -4px;
+  animation: frenzyFlash 0.6s ease-in-out infinite alternate;
+}
+
+@keyframes frenzyFlash {
+  from { outline-color: #FFD700; }
+  to   { outline-color: #FF8800; }
+}
+
+#frenzy-timer {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #2A1A00;
+  border-top:    2px solid #FFD700;
+  border-left:   2px solid #FFD700;
+  border-bottom: 2px solid #7A5A00;
+  border-right:  2px solid #7A5A00;
+  box-shadow: inset 2px 2px 0 #3A2A00, inset -2px -2px 0 #1A0A00, 0 0 16px rgba(255,200,0,0.5);
+  padding: 6px 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 9999;
+  white-space: nowrap;
+}
+
+#frenzy-timer-label {
+  font-size: 0.88rem;
+  color: var(--mc-text-gold);
+  text-shadow: 1px 1px 0 #5A3A00, 0 0 8px #FFB300;
+  letter-spacing: 1px;
+}
+
+#frenzy-timer-secs {
+  font-size: 1.1rem;
+  color: #FFFF88;
+  text-shadow: 1px 1px 0 #5A5A00, 0 0 10px #FFFF00;
+  min-width: 36px;
+  text-align: right;
+}
+
+/* ── Golden burst reward popup ────────────────────────────── */
+.golden-burst {
+  position: fixed;
+  text-align: center;
+  z-index: 9500;
+  pointer-events: none;
+  animation: goldenBurstFloat 2s ease-out forwards;
+  transform: translateX(-50%);
+}
+
+.golden-burst-title {
+  font-size: 1.3rem;
+  color: #FFD700;
+  text-shadow:
+    2px 2px 0 #7A4A00,
+    0 0 12px rgba(255,200,0,0.8);
+  white-space: nowrap;
+  margin-bottom: 4px;
+}
+
+.golden-burst-sub {
+  font-size: 0.85rem;
+  color: #FFEE88;
+  text-shadow: 1px 1px 0 #5A3A00;
+  white-space: nowrap;
+}
+
+@keyframes goldenBurstFloat {
+  0%   { opacity: 0; transform: translateX(-50%) translateY(0) scale(0.7); }
+  15%  { opacity: 1; transform: translateX(-50%) translateY(-10px) scale(1.1); }
+  70%  { opacity: 1; transform: translateX(-50%) translateY(-50px) scale(1); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-90px) scale(0.9); }
+}

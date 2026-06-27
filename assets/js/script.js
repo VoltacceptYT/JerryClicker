@@ -1023,6 +1023,195 @@ function loadGame() {
 }
 
 /* -------------------------
+  Golden Jerry System
+  Spawns randomly every 3-5 minutes at a random position on screen.
+  Click it for one of three rewards:
+    - Candy Windfall: big lump sum of candies
+    - Frenzy: 2x production for 30 seconds
+    - Lucky: bonus based on current auto rate
+  Disappears after 13 seconds if not clicked.
+-------------------------*/
+
+let goldenJerryTimeout = null;
+let goldenJerryDespawnTimeout = null;
+let goldenJerryActive = false;
+let frenzyActive = false;
+let frenzyTimeout = null;
+
+function scheduleGoldenJerry() {
+  // Spawn every 3–5 minutes (180000–300000ms)
+  const delay = 180000 + Math.random() * 120000;
+  goldenJerryTimeout = setTimeout(() => {
+    // runInternal: spawning reads no gameState but we suppress to be safe
+    runInternal(spawnGoldenJerry);
+  }, delay);
+}
+
+function spawnGoldenJerry() {
+  // Must already be inside runInternal() when called
+  if (goldenJerryActive) return;
+  goldenJerryActive = true;
+
+  const el = document.createElement("div");
+  el.id = "golden-jerry";
+
+  // Random position: keep away from edges (80px padding, avoid top header ~160px)
+  const maxX = window.innerWidth - 100;
+  const maxY = window.innerHeight - 100;
+  const x = 80 + Math.random() * (maxX - 80);
+  const y = 160 + Math.random() * (maxY - 220);
+
+  el.style.left = x + "px";
+  el.style.top = y + "px";
+
+  document.body.appendChild(el);
+
+  // Animate in — rAF fires outside suppression but only touches DOM, not gameState
+  requestAnimationFrame(() => el.classList.add("golden-jerry-visible"));
+
+  // Despawn after 13 seconds if not clicked — wrapped in runInternal
+  goldenJerryDespawnTimeout = setTimeout(() => {
+    runInternal(despawnGoldenJerry);
+  }, 13000);
+
+  // Click handler — wrap entire body in runInternal so every gameState write is suppressed
+  el.addEventListener("click", (e) => {
+    e.stopPropagation();
+    runInternal(() => claimGoldenJerry(x, y));
+  });
+}
+
+function despawnGoldenJerry() {
+  // Must already be inside runInternal() when called
+  const el = document.getElementById("golden-jerry");
+  if (!el) return;
+  el.classList.remove("golden-jerry-visible");
+  el.classList.add("golden-jerry-fade");
+  // DOM-only cleanup; no gameState touched here
+  setTimeout(() => el.remove(), 400);
+  goldenJerryActive = false;
+  scheduleGoldenJerry();
+}
+
+function claimGoldenJerry(x, y) {
+  // Must already be inside runInternal() when called (guaranteed by click handler above)
+  clearTimeout(goldenJerryDespawnTimeout);
+
+  const el = document.getElementById("golden-jerry");
+  if (!el) return;
+
+  // Pick a reward
+  const roll = Math.random();
+  let rewardText = "";
+  let rewardSub = "";
+
+  if (roll < 0.40) {
+    // Candy Windfall: 15 minutes of auto-gen, min 30 * perClick
+    const windfall = Math.max(
+      Math.floor(gameState.perClick * 30),
+      Math.floor(gameState.autoRate * 60 * 15)
+    );
+    gameState.candies += windfall;           // suppressed ✓
+    rewardText = "Candy Windfall!";
+    rewardSub = "+" + formatNumber(windfall) + " candies";
+    updateUI();
+  } else if (roll < 0.75) {
+    // Frenzy: 2x all production for 30 seconds
+    if (!frenzyActive) {
+      frenzyActive = true;
+      gameState.perClick *= 2;               // suppressed ✓
+      gameState.autoRate *= 2;               // suppressed ✓
+      document.body.classList.add("frenzy-active");
+      showFrenzyTimer(30);
+      // Undo frenzy after 30s — wrapped in its own runInternal
+      frenzyTimeout = setTimeout(() => {
+        runInternal(() => {
+          gameState.perClick /= 2;           // suppressed ✓
+          gameState.autoRate /= 2;           // suppressed ✓
+          frenzyActive = false;
+          document.body.classList.remove("frenzy-active");
+          const timerEl = document.getElementById("frenzy-timer");
+          if (timerEl) timerEl.remove();
+          updateUI();
+        });
+      }, 30000);
+    } else {
+      // Already in frenzy — give windfall instead
+      const windfall = Math.max(
+        Math.floor(gameState.perClick * 20),
+        Math.floor(gameState.autoRate * 60 * 8)
+      );
+      gameState.candies += windfall;         // suppressed ✓ (still inside outer runInternal)
+      updateUI();
+    }
+    rewardText = "Frenzy!";
+    rewardSub = "2x production for 30s";
+  } else {
+    // Lucky: 10% of current candies, min 30 * perClick
+    const lucky = Math.max(
+      Math.floor(gameState.perClick * 30),
+      Math.floor(gameState.candies * 0.10)
+    );
+    gameState.candies += lucky;              // suppressed ✓
+    rewardText = "Lucky!";
+    rewardSub = "+" + formatNumber(lucky) + " candies";
+    updateUI();
+  }
+
+  // Burst animation — pure DOM, no gameState
+  showGoldenBurst(x, y, rewardText, rewardSub);
+
+  // Remove element — pure DOM, setTimeout body touches no gameState
+  el.classList.add("golden-jerry-burst");
+  setTimeout(() => el.remove(), 300);
+
+  goldenJerryActive = false;
+  scheduleGoldenJerry();
+}
+
+function showFrenzyTimer(seconds) {
+  // Called from within runInternal() — DOM only, no gameState writes
+  let existing = document.getElementById("frenzy-timer");
+  if (existing) existing.remove();
+
+  const el = document.createElement("div");
+  el.id = "frenzy-timer";
+  el.innerHTML = `<span id="frenzy-timer-label">FRENZY</span><span id="frenzy-timer-secs">${seconds}s</span>`;
+  document.body.appendChild(el);
+
+  let remaining = seconds;
+  // setInterval fires outside suppression — wrap body in runInternal
+  // (only touches DOM text content, but wrapping is cheap insurance)
+  const tick = setInterval(() => {
+    runInternal(() => {
+      remaining--;
+      const secEl = document.getElementById("frenzy-timer-secs");
+      if (secEl) secEl.textContent = remaining + "s";
+      if (remaining <= 0) {
+        clearInterval(tick);
+        const timerEl = document.getElementById("frenzy-timer");
+        if (timerEl) timerEl.remove();
+      }
+    });
+  }, 1000);
+}
+
+function showGoldenBurst(x, y, title, sub) {
+  // Pure DOM — no gameState involved
+  const el = document.createElement("div");
+  el.className = "golden-burst";
+  el.innerHTML = `<div class="golden-burst-title">${title}</div><div class="golden-burst-sub">${sub}</div>`;
+  el.style.left = x + "px";
+  el.style.top = (y - 20) + "px";
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2000);
+}
+
+// Kick off the first Golden Jerry — scheduleGoldenJerry itself touches no gameState,
+// but wrap for consistency and future-proofing
+runInternal(scheduleGoldenJerry);
+
+/* -------------------------
   Finalize: apply any pending wraps, then safe-init load/save and UI
 -------------------------*/
 
