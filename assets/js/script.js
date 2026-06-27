@@ -950,7 +950,7 @@ function exportSave() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "jerry-clicker-save.txt";
+  a.download = "JerryClicker.txt";
   a.click();
   URL.revokeObjectURL(url);
 
@@ -970,7 +970,7 @@ function saveGame() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "jerry-clicker-save.txt";
+  a.download = "JerryClicker.txt";
   a.click();
   URL.revokeObjectURL(url);
 
