@@ -67,10 +67,10 @@ var upgrades = [
   {
     id: "jerry_staff",
     name: "Jerry Staff",
-    cost: 4000,
-    effect: "Doubles auto-gen rate",
+    cost: 40000000,
+    effect: "Quadruples auto-gen rate",
     type: "autoMult",
-    value: 2,
+    value: 4,
   },
   {
     id: "jerry_rune",
@@ -699,7 +699,7 @@ function buyUpgrade(id) {
     // Deduct cost and apply new upgrade
     gameState.candies -= state.currentCost;
     state.count++;
-    state.currentCost = state.currentCost * 1.15;
+    state.currentCost = state.currentCost * 1.5;
 
     applyUpgrade(upgrade);
     initUI();
@@ -1176,7 +1176,7 @@ function showFrenzyTimer(seconds) {
 
   const el = document.createElement("div");
   el.id = "frenzy-timer";
-  el.innerHTML = `<span id="frenzy-timer-label">FRENZY</span><span id="frenzy-timer-secs">${seconds}s</span>`;
+  el.innerHTML = `<span id="frenzy-timer-label">FRENZY</span><span id="frenzy-timer-secs">${seconds}</span>`;
   document.body.appendChild(el);
 
   let remaining = seconds;
