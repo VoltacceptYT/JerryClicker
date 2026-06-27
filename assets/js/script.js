@@ -549,6 +549,48 @@ function showPopup(message, options = {}) {
   });
 }
 
+// Shared helper: apply a loaded/parsed gameState object and refresh all UI + cosmetics.
+// Must be called from within runInternal() or will be suppressed by caller.
+function applyLoadedState(loaded) {
+  runInternal(() => {
+    gameState = loaded;
+  });
+
+  const jerryEl = document.getElementById("jerry");
+
+  // Clear ALL cosmetic classes first so no bleed-through from a previous session
+  jerryEl.classList.remove(
+    "glasses-3d", "fast-animate", "lord", "scuba", "iron", "angel"
+  );
+
+  // Re-apply whichever cosmetic is active in the loaded save
+  const cosmeticMap = {
+    pet_item_toy_jerry:   () => { jerryEl.classList.add("glasses-3d", "fast-animate"); },
+    pet_item_lord_jerry:  () => { jerryEl.classList.add("lord"); },
+    pet_item_scuba_jerry: () => { jerryEl.classList.add("scuba"); },
+    pet_item_iron_jerry:  () => { jerryEl.classList.add("iron"); },
+    pet_item_angel_jerry: () => { jerryEl.classList.add("angel"); },
+  };
+  for (const [id, apply] of Object.entries(cosmeticMap)) {
+    if (gameState.upgrades[id]?.count > 0) {
+      apply();
+      break; // only one cosmetic active at a time
+    }
+  }
+
+  // Show / hide prestige UI
+  if (gameState.upgrades["aspect_of_the_jerry"]?.count > 0) {
+    document.getElementById("prestige-info").style.display = "block";
+    document.getElementById("prestige-btn").disabled = false;
+  } else {
+    document.getElementById("prestige-info").style.display = "none";
+    document.getElementById("prestige-btn").disabled = true;
+  }
+
+  // Full UI re-render (not just updateUI) so the upgrades panel reflects the new state
+  initUI();
+}
+
 function loadFromLocalStorage() {
   try {
     const saved = localStorage.getItem("jerryClickerSave");
@@ -560,22 +602,7 @@ function loadFromLocalStorage() {
         data += String.fromCharCode(obfuscated.charCodeAt(i) ^ key);
       }
       const loaded = migrateSave(JSON.parse(data));
-      // IMPORTANT: set gameState safely inside runInternal to avoid detection
-      runInternal(() => {
-        gameState = loaded;
-      });
-
-      // Re-apply cosmetic effects
-      if (gameState.upgrades["pet_item_toy_jerry"].count > 0) {
-        document.getElementById("jerry").classList.add("glasses-3d");
-        document.getElementById("jerry").classList.add("fast-animate");
-      }
-
-      // Show prestige info if unlocked
-      if (gameState.upgrades["aspect_of_the_jerry"].count > 0) {
-        document.getElementById("prestige-info").style.display = "block";
-        document.getElementById("prestige-btn").disabled = false;
-      }
+      applyLoadedState(loaded);
     }
   } catch (err) {
     console.error("Failed to load from localStorage:", err);
@@ -997,21 +1024,7 @@ function loadGame() {
         }
 
         const loaded = migrateSave(JSON.parse(data));
-        runInternal(() => {
-          gameState = loaded;
-        });
-
-        if (gameState.upgrades["pet_item_toy_jerry"].count > 0) {
-          document.getElementById("jerry").classList.add("glasses-3d");
-          document.getElementById("jerry").classList.add("fast-animate");
-        }
-
-        if (gameState.upgrades["aspect_of_the_jerry"].count > 0) {
-          document.getElementById("prestige-info").style.display = "block";
-          document.getElementById("prestige-btn").disabled = false;
-        }
-
-        updateUI();
+        applyLoadedState(loaded);
         showPopup("Game loaded!");
       } catch (err) {
         showPopup("Failed to load save file!");
