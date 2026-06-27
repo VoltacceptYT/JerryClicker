@@ -496,6 +496,31 @@ runInternal(() => {
   (these functions exist as in your original file)
 -------------------------*/
 
+/* -------------------------
+  Save Migration
+  Runs after any load to fix upgrade costs if the source definitions changed.
+  Recalculates currentCost based on how many times the player has bought the upgrade,
+  using the new base cost — so existing stacks are preserved but old pricing is gone.
+-------------------------*/
+function migrateSave(state) {
+  upgrades.forEach((def) => {
+    const entry = state.upgrades[def.id];
+    if (!entry) return;
+
+    // Reconstruct what currentCost should be given the new base cost and owned count.
+    // buyUpgrade applies *1.15 per purchase, so: currentCost = baseCost * 1.15^count
+    const expectedCost = def.cost * Math.pow(1.15, entry.count);
+
+    // If the stored cost doesn't match (old pricing), update it.
+    // Use a small epsilon to avoid floating-point false positives.
+    if (Math.abs(entry.currentCost - expectedCost) / expectedCost > 0.001) {
+      entry.currentCost = expectedCost;
+    }
+  });
+
+  return state;
+}
+
 function showPopup(message, options = {}) {
   const popup = document.getElementById("popup");
   const msg = document.getElementById("popup-message");
@@ -534,7 +559,7 @@ function loadFromLocalStorage() {
       for (let i = 0; i < obfuscated.length; i++) {
         data += String.fromCharCode(obfuscated.charCodeAt(i) ^ key);
       }
-      const loaded = JSON.parse(data);
+      const loaded = migrateSave(JSON.parse(data));
       // IMPORTANT: set gameState safely inside runInternal to avoid detection
       runInternal(() => {
         gameState = loaded;
@@ -971,7 +996,7 @@ function loadGame() {
           data += String.fromCharCode(obfuscated.charCodeAt(i) ^ key);
         }
 
-        const loaded = JSON.parse(data);
+        const loaded = migrateSave(JSON.parse(data));
         runInternal(() => {
           gameState = loaded;
         });
