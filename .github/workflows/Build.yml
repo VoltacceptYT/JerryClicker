@@ -12,15 +12,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install libnds, libfat and ndstool
-        run: |
-          dkp-pacman -Sy --noconfirm
-          dkp-pacman -S --needed --noconfirm nds-dev
-
       - name: Toolchain layout (diagnostics)
         run: |
           echo "DEVKITPRO=$DEVKITPRO DEVKITARM=$DEVKITARM"
-          find "$DEVKITPRO" -maxdepth 4 \( -name '*.specs' -o -name 'default.elf' -o -name 'ds7*.elf' -o -name 'libnds9.a' -o -name 'libfat.a' -o -name 'libcalico_ds9.a' \) 2>/dev/null || true
           make info
 
       - name: Build
