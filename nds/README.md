@@ -1,58 +1,35 @@
 # JerryClicker NDS Port
 
-This directory contains a Nintendo DS port of the Jerry Clicker concept using the sprite assets already present in this repository as the source of truth.
+This project turns the existing JerryClicker web game into a Nintendo DS build using the repository's real sprite assets.
 
-## What this port does
+What is included:
+- A libnds-based project skeleton for the DS
+- A sprite conversion tool that reads the actual PNGs from this repository
+- A playable DS-style clicker loop with Jerry, upgrades, and Golden Jerry events
+- A build process that regenerates the sprite header before compilation
 
-- Uses the existing JerryClicker art as the basis for the handheld version
-- Converts the repo’s sprite PNG files into NDS-friendly raw sprite data via a build script
-- Keeps the gameplay loop simple and portable: tap Jerry to gain candies, buy upgrades, and collect a Golden Jerry bonus
-- Uses the actual sprites from the repo instead of drawing new placeholder art
+Structure:
+- `nds/Makefile` — build configuration
+- `nds/source/main.cpp` — DS game logic and rendering
+- `nds/tools/convert_sprites.py` — converts repo PNGs into generated C sprite data
+- `nds/generated/` — generated output created during the build
 
-## Source assets used
+Requirements:
+- devkitPro / libnds installed at `/opt/devkitpro` or adjust `DEVKITPRO` in the Makefile
+- Python 3 with Pillow (`python3 -m pip install pillow`)
 
-The conversion script reads from the original repo assets:
-
-- `assets/img/cosmetics/jerry.png`
-- `assets/img/cosmetics/angel_jerry.png`
-- `assets/img/cosmetics/iron_jerry.png`
-- `assets/img/cosmetics/lord_jerry.png`
-- `assets/img/cosmetics/scuba_jerry.png`
-- `assets/img/powerups/golden_jerry.png`
-- `api/resources/jerry_candy.png`
-- `assets/img/ui/button.png`
-
-## Build prerequisites
-
-Install devkitPro / libnds:
-
-- https://devkitpro.org/
-
-Then install Python dependencies for the build script:
-
-```bash
-python3 -m pip install pillow
-```
-
-## Convert the sprites
-
-From the repository root:
+Build:
 
 ```bash
 cd nds
-python3 tools/convert_sprites.py ../assets ../api/resources
-```
-
-This produces a `build/generated` folder containing the sprite data for the DS project.
-
-## Compile
-
-```bash
 make
 ```
 
-Then run the resulting ROM in a DS emulator such as DeSmuME, melonDS, or an actual Nintendo DS console.
+The build will automatically run the sprite conversion script, read the source PNGs from the repo, and generate `generated/sprites.h` before compiling.
 
-## Notes
+Run:
+- Use an emulator like melonDS, DeSmuME, or a real Nintendo DS.
 
-The DS app is intentionally small and efficient, matching the original clicker loop while keeping the project portable. The actual repo PNGs are preserved and converted at build time, so any new sprite work in the browser repo can be re-exported into the DS build by rerunning the conversion script.
+Notes:
+- This project uses the repo's real Jerry assets rather than custom placeholders.
+- The DS app keeps the clicker loop lightweight and portable: tap Jerry to gain candies, buy upgrades, and catch Golden Jerry for a burst of currency.

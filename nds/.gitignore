@@ -1,0 +1,42 @@
+DEVKITPRO ?= /opt/devkitpro
+include $(DEVKITPRO)/base_tools
+
+TARGET := jerryclicker_nds
+SRC_DIR := source
+TOOLS_DIR := tools
+OUT_DIR := generated
+BUILD_DIR := build
+
+CXX := arm-none-eabi-g++
+CFLAGS := -MMD -MP -Wall -O2 -marm -march=armv5te -mtune=arm946e-s -fomit-frame-pointer -ffunction-sections -fdata-sections
+CPPFLAGS := -I$(DEVKITPRO)/libnds/include -I$(DEVKITPRO)/libfat/include -I$(DEVKITPRO)/libgba/include -I$(OUT_DIR)
+LDFLAGS := -specs=nds.specs -L$(DEVKITPRO)/libnds/lib -L$(DEVKITPRO)/libfat/lib -L$(DEVKITPRO)/libgba/lib
+LDLIBS := -lnds9 -lmm9
+
+SOURCES := $(wildcard $(SRC_DIR)/*.cpp)
+OBJECTS := $(patsubst $(SRC_DIR)/%.cpp,$(BUILD_DIR)/%.o,$(SOURCES))
+GEN_SPRITES := $(OUT_DIR)/sprites.h
+
+all: $(BUILD_DIR)/$(TARGET).nds
+
+$(OUT_DIR):
+	mkdir -p $(OUT_DIR)
+
+$(GEN_SPRITES): $(TOOLS_DIR)/convert_sprites.py | $(OUT_DIR)
+	python3 $(TOOLS_DIR)/convert_sprites.py .. --out $(OUT_DIR)
+
+$(BUILD_DIR):
+	mkdir -p $(BUILD_DIR)
+
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp $(GEN_SPRITES) | $(BUILD_DIR)
+	$(CXX) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/$(TARGET).nds: $(OBJECTS)
+	$(CXX) $(LDFLAGS) -o $(BUILD_DIR)/$(TARGET).elf $(OBJECTS) $(LDLIBS)
+	arm-none-eabi-objcopy -O binary $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET).bin
+	ndstool -c $(BUILD_DIR)/$(TARGET).nds -9 $(BUILD_DIR)/$(TARGET).bin
+
+clean:
+	rm -rf $(BUILD_DIR) $(OUT_DIR)
+
+.PHONY: all clean
