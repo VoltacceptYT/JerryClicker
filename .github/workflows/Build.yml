@@ -2,18 +2,24 @@ name: Build Nintendo DS ROM
 
 on:
   push:
-    branches: [ main ]
+    branches: [nds-port]
   pull_request:
+    branches: [nds-port]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      DEVKITPRO: /opt/devkitpro
+      DEVKITARM: /opt/devkitpro/devkitARM
+      LIBNDS: /opt/devkitpro/libnds
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install build dependencies
+      - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y wget
@@ -26,15 +32,23 @@ jobs:
 
       - name: Install devkitARM and libnds
         run: |
-          sudo dkp-pacman -S --needed --noconfirm devkitARM libnds
+          sudo dkp-pacman -Sy --needed --noconfirm devkitARM libnds
 
-      - name: Build Nintendo DS ROM
-        shell: bash
-        env:
-          DEVKITPRO: /opt/devkitpro
-          DEVKITARM: /opt/devkitpro/devkitARM
+      - name: Verify libnds installation
+        run: |
+          test -f "$LIBNDS/lib/libnds9.a"
+          echo "Found $LIBNDS/lib/libnds9.a"
+
+      - name: Build ROM
         run: |
           export PATH="$DEVKITARM/bin:$PATH"
           cd nds
           make clean
           make
+
+      - name: Upload ROM
+        uses: actions/upload-artifact@v4
+        with:
+          name: jerryclicker-nds
+          path: nds/jerryclicker.nds
+          if-no-files-found: error
