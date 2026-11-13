@@ -27,5 +27,5 @@ $(TARGET).elf: generated/sprites.h
 include $(DEVKITARM)/ds_rules
 
 clean:
-	$(MAKE) -f $(DEVKITARM)/ds_rules clean
-	rm -f $(TARGET).nds generated/sprites.h generated/sprite_manifest.json
+	rm -rf $(BUILD)
+	rm -f $(TARGET).elf $(TARGET).nds generated/sprites.h generated/sprite_manifest.json
