@@ -8,6 +8,12 @@ SOURCES := source
 DATA :=
 INCLUDES := -Igenerated
 
+PREFIX := arm-none-eabi-
+CC := $(DEVKITARM)/bin/$(PREFIX)gcc
+CXX := $(DEVKITARM)/bin/$(PREFIX)g++
+AS := $(CC)
+LD := $(CC)
+
 ARCH := -mthumb -mthumb-interwork -march=armv5te -mtune=arm946e-s
 CFLAGS := -g -Wall -O2 -ffunction-sections -fdata-sections $(ARCH)
 CXXFLAGS := $(CFLAGS) -fno-rtti -fno-exceptions
