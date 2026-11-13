@@ -20,11 +20,12 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Install Python dependency for sprite generation
+      - name: Install Python and Pillow
         shell: bash
         run: |
           set -eux
-          python3 -m pip install --user Pillow
+          apt-get update
+          apt-get install -y python3 python3-pil
 
       - name: Build JerryClicker NDS ROM
         shell: bash
