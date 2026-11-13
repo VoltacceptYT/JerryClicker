@@ -16,26 +16,32 @@ jobs:
     container:
       image: devkitpro/devkitarm:latest
 
+    env:
+      DEVKITPRO: /opt/devkitpro
+      DEVKITARM: /opt/devkitpro/devkitARM
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Install Nintendo DS libraries and Python dependency
+      - name: Install build dependencies
         shell: bash
         run: |
           set -eux
-          dkp-pacman -Syu --noconfirm
-          dkp-pacman -S --needed --noconfirm nds-dev libnds
-          test -f /opt/devkitpro/libnds/lib/libnds9.a
-
           apt-get update
-          apt-get install -y python3 python3-pil
+          apt-get install -y git make python3 python3-pil
+
+      - name: Build and install libnds from source
+        shell: bash
+        run: |
+          set -eux
+          git clone --depth 1 https://github.com/devkitPro/libnds.git /tmp/libnds
+          make -C /tmp/libnds
+          make -C /tmp/libnds install
+          test -f "$DEVKITPRO/libnds/lib/libnds9.a"
 
       - name: Build JerryClicker NDS ROM
         shell: bash
-        env:
-          DEVKITPRO: /opt/devkitpro
-          DEVKITARM: /opt/devkitpro/devkitARM
         run: |
           set -eux
           cd nds
