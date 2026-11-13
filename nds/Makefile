@@ -1,6 +1,8 @@
 # devkitPro / devkitARM libnds project
 DEVKITPRO ?= /opt/devkitpro
 DEVKITARM ?= $(DEVKITPRO)/devkitARM
+LIBNDS ?= $(DEVKITPRO)/libnds
+PORTLIBS ?= $(DEVKITPRO)/portlibs
 
 include $(DEVKITARM)/ds_rules
 
@@ -27,7 +29,6 @@ LIBDIRS := $(LIBNDS) $(PORTLIBS)
 .PHONY: all clean
 all: generated/sprites.h $(TARGET).nds
 
-# Generated sprite data is compiled into the ROM.
 generated/sprites.h: tools/convert_sprites.py
 	python3 tools/convert_sprites.py .. --out nds/generated
 
