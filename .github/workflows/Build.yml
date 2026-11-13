@@ -2,55 +2,39 @@ name: Build Nintendo DS ROM
 
 on:
   push:
-    branches: [nds-port]
+    branches: [ main ]
   pull_request:
-    branches: [nds-port]
-  workflow_dispatch:
-
-permissions:
-  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      image: devkitpro/devkitarm:latest
-
-    env:
-      DEVKITPRO: /opt/devkitpro
-      DEVKITARM: /opt/devkitpro/devkitARM
 
     steps:
-      - name: Check out repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install build dependencies
-        shell: bash
         run: |
-          set -eux
-          apt-get update
-          apt-get install -y git make python3 python3-pil
+          sudo apt-get update
+          sudo apt-get install -y wget
 
-      - name: Build and install libnds from source
-        shell: bash
+      - name: Install devkitPro pacman
         run: |
-          set -eux
-          git clone --depth 1 https://github.com/devkitPro/libnds.git /tmp/libnds
-          make -C /tmp/libnds
-          make -C /tmp/libnds install
-          test -f "$DEVKITPRO/libnds/lib/libnds9.a"
+          wget https://apt.devkitpro.org/install-devkitpro-pacman
+          chmod +x install-devkitpro-pacman
+          sudo ./install-devkitpro-pacman
 
-      - name: Build JerryClicker NDS ROM
-        shell: bash
+      - name: Install devkitARM and libnds
         run: |
-          set -eux
+          sudo dkp-pacman -S --needed --noconfirm devkitARM libnds
+
+      - name: Build Nintendo DS ROM
+        shell: bash
+        env:
+          DEVKITPRO: /opt/devkitpro
+          DEVKITARM: /opt/devkitpro/devkitARM
+        run: |
+          export PATH="$DEVKITARM/bin:$PATH"
           cd nds
           make clean
           make
-
-      - name: Upload ROM artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: jerryclicker-nds
-          path: nds/jerryclicker.nds
-          if-no-files-found: error
