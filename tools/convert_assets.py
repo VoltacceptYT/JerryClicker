@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Regenerates source/sprites.c, source/sprites.h and icon.bmp from assets/.
-Needs Pillow. The generated files are committed, so CI does not run this."""
+Needs Pillow. The GitHub Actions workflow runs this before `make`; the generated
+files are also committed so local builds work without running it."""
 import os, struct
 from collections import Counter
 from PIL import Image

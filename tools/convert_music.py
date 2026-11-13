@@ -8,8 +8,8 @@ Produces
     source/music_info.h               sample rate / loop point constants used by source/audio.c
     (optional) --preview out.wav      what the DS will actually play, decoded back to 16-bit PCM
 
-Needs: ffmpeg on PATH and numpy.  The generated files are committed, so the normal
-build (make / GitHub Actions) does NOT need either of them.
+Needs: ffmpeg on PATH and numpy.  The generated files are not committed: the GitHub
+Actions workflow runs this script before `make`; run it once yourself for local builds.
 
 Format notes (GBATEK "DS Sound Channel Formats"):
   * word 0 is a header: bits 0-15 = initial PCM16 predictor, bits 16-22 = step index (0..88)

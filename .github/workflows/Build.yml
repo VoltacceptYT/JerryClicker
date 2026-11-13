@@ -12,7 +12,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Toolchain layout (diagnostics)
+      - name: Install Tools
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ffmpeg python3-numpy python3-pil
+
+      - name: Convert Assets
+        run: python3 tools/convert_assets.py
+
+      - name: Convert Music
+        run: python3 tools/convert_music.py --rate 22050
+
+      - name: Toolchain Layout (diagnostics)
         run: |
           echo "DEVKITPRO=$DEVKITPRO DEVKITARM=$DEVKITARM"
           make info
