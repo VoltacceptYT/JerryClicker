@@ -17,28 +17,33 @@ jobs:
       DEVKITPRO: /opt/devkitpro
       DEVKITARM: /opt/devkitpro/devkitARM
       LIBNDS: /opt/devkitpro/libnds
+      PORTLIBS: /opt/devkitpro/portlibs
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Verify devkitPro libraries
+      - name: Verify devkitPro NDS library
         run: |
-          test -f "$LIBNDS/lib/libnds9.a"
-          echo "Found $LIBNDS/lib/libnds9.a"
+          ls -l /opt/devkitpro/libnds/lib/libnds9.a
+          test -f /opt/devkitpro/libnds/lib/libnds9.a
 
-      - name: Install Pillow
+      - name: Install Pillow for sprite generation
         run: |
           apt-get update
           apt-get install -y python3-pil
 
-      - name: Build ROM
+      - name: Build Nintendo DS ROM
         run: |
+          export DEVKITPRO=/opt/devkitpro
+          export DEVKITARM=/opt/devkitpro/devkitARM
+          export LIBNDS=/opt/devkitpro/libnds
+          export PORTLIBS=/opt/devkitpro/portlibs
           cd nds
           make clean
-          make
+          make LIBNDS=/opt/devkitpro/libnds PORTLIBS=/opt/devkitpro/portlibs
 
-      - name: Upload ROM
+      - name: Upload ROM artifact
         uses: actions/upload-artifact@v4
         with:
           name: jerryclicker-nds
