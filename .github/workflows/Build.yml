@@ -22,15 +22,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install NDS development packages
+      - name: Verify devkitPro libraries
         run: |
-          dkp-pacman -Syyu --noconfirm
-          dkp-pacman -S --needed --noconfirm nds-dev nds-portlibs
-
-      - name: Verify libnds
-        run: |
-          ls -l "$LIBNDS/lib/libnds9.a"
           test -f "$LIBNDS/lib/libnds9.a"
+          echo "Found $LIBNDS/lib/libnds9.a"
 
       - name: Install Pillow
         run: |
