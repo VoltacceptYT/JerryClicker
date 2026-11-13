@@ -10,6 +10,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: devkitpro/devkitarm:latest
+
     env:
       DEVKITPRO: /opt/devkitpro
       DEVKITARM: /opt/devkitpro/devkitARM
@@ -19,29 +22,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y wget
-
-      - name: Install devkitPro pacman
-        run: |
-          wget https://apt.devkitpro.org/install-devkitpro-pacman
-          chmod +x install-devkitpro-pacman
-          sudo ./install-devkitpro-pacman
-
-      - name: Install devkitARM and libnds
-        run: |
-          sudo dkp-pacman -Sy --needed --noconfirm devkitARM libnds
-
-      - name: Verify libnds installation
-        run: |
-          test -f "$LIBNDS/lib/libnds9.a"
-          echo "Found $LIBNDS/lib/libnds9.a"
-
       - name: Build ROM
         run: |
-          export PATH="$DEVKITARM/bin:$PATH"
           cd nds
           make clean
           make
