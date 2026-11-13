@@ -1,6 +1,7 @@
 # devkitPro / devkitARM libnds project
 DEVKITPRO ?= /opt/devkitpro
 DEVKITARM ?= $(DEVKITPRO)/devkitARM
+LIBNDS ?= $(DEVKITPRO)/libnds
 
 TARGET := jerryclicker
 BUILD := build
@@ -21,13 +22,13 @@ ASFLAGS := $(ARCH)
 LDFLAGS := -specs=ds_arm9.specs -g $(ARCH) -Wl,--gc-sections
 LIBS := -lnds9
 
-LIBNDS ?= $(DEVKITPRO)/libnds
-LIBDIRS := $(LIBNDS)/lib
+# ds_rules adds /lib to each LIBDIRS entry.
+LIBDIRS := $(LIBNDS)
 
 .PHONY: all clean
 all: generated/sprites.h $(TARGET).nds
 
-# Generated sprite data is compiled into the ROM; no FAT setup is needed at runtime.
+# Generated sprite data is compiled into the ROM.
 generated/sprites.h: tools/convert_sprites.py
 	python3 tools/convert_sprites.py .. --out nds/generated
 
