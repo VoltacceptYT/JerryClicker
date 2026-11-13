@@ -1,1 +1,4 @@
-*.piskel
+*.elf
+*.nds
+*.map
+build/

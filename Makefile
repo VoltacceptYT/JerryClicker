@@ -45,7 +45,9 @@ ARM7 := $(firstword $(wildcard \
     $(CALICO)/bin/ds7_*.elf))
 
 SOURCES := $(wildcard $(SRCDIR)/*.c)
-OBJECTS := $(patsubst $(SRCDIR)/%.c,$(BUILD)/%.o,$(SOURCES))
+ASMSRCS := $(wildcard $(SRCDIR)/*.s)
+OBJECTS := $(patsubst $(SRCDIR)/%.c,$(BUILD)/%.o,$(SOURCES)) \
+           $(patsubst $(SRCDIR)/%.s,$(BUILD)/%.o,$(ASMSRCS))
 
 .PHONY: all clean info
 all: $(TARGET).nds
@@ -57,12 +59,19 @@ $(BUILD)/%.o: $(SRCDIR)/%.c
 	@mkdir -p $(BUILD)
 	$(CC) -MMD -MP $(CFLAGS) -c $< -o $@
 
+# Assembly sources (music_data.s embeds the ADPCM music with .incbin).
+# .incbin is invisible to gcc's dependency tracking, so list the data file explicitly.
+$(BUILD)/%.o: $(SRCDIR)/%.s
+	@mkdir -p $(BUILD)
+	$(CC) $(ARCH) -c $< -o $@
+$(BUILD)/music_data.o: assets/music/jerry_united.adpcm
+
 $(TARGET).elf: $(OBJECTS)
 	$(CC) $(ARCH) $(SPECS) -Wl,--gc-sections -Wl,-Map,$(TARGET).map $(OBJECTS) $(LIBDIRS) -Wl,--start-group $(LIBS) -Wl,--end-group $(LIBM) -o $@
 
 $(TARGET).nds: $(TARGET).elf icon.bmp
 	@test -n "$(ARM7)" || (echo "ERROR: could not find default ARM7 core"; exit 1)
-	ndstool -c $@ -9 $< -7 $(ARM7) -b icon.bmp "Jerry Clicker;Click for Jerry Candies;Jerry"
+	ndstool -c $@ -9 $< -7 $(ARM7) -b icon.bmp "Jerry Clicker;Click for Jerry Candies;VoltacceptYT"
 
 clean:
 	rm -rf $(BUILD) $(TARGET).elf $(TARGET).nds $(TARGET).map

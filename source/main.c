@@ -1,7 +1,7 @@
 // Jerry Clicker for Nintendo DS
 //  Bottom screen (touch): stats, Jerry, buttons.   Top screen: upgrade list.
 //  Controls: Touch Jerry or B = click | Up/Down = select | L/R = page | A = buy
-//            Start = prestige | Touch SAVE / PRESTIGE buttons
+//            Start = prestige | Select = music on/off | Touch SAVE / PRESTIGE buttons
 //  Both screens are software-rendered (see gfx.c / ui.c) using the original font and sprites.
 #include <fat.h>
 #include <nds.h>
@@ -10,6 +10,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "audio.h"
 #include "game.h"
 #include "gfx.h"
 #include "sprites.h"
@@ -280,6 +281,7 @@ int main(void) {
     fatOk = fatInitDefault();
     load_game();
     schedule_golden();
+    audio_init(); // looping background music (plays on the ARM7 sound hardware)
 
     u32 sinceSave = 0;
     bool dirtyTop = true, dirtyBot = true;
@@ -341,6 +343,16 @@ int main(void) {
             }
             if (down & KEY_START) {
                 request_prestige();
+                dirtyBot = true;
+            }
+            if (down & KEY_SELECT) {
+                if (!audio_music_playing()) {
+                    set_msg("Music unavailable", "No free sound channel", 90);
+                } else if (audio_music_toggle()) {
+                    set_msg("Music: ON", "Select = mute", 90);
+                } else {
+                    set_msg("Music: OFF", "Select = unmute", 90);
+                }
                 dirtyBot = true;
             }
             if (touched) {
