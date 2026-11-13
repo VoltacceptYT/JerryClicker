@@ -23,8 +23,13 @@ CFLAGS := -g -Wall -O2 -ffunction-sections -fdata-sections $(ARCH)
 CXXFLAGS := $(CFLAGS) -fno-rtti -fno-exceptions
 ASFLAGS := $(ARCH)
 LDFLAGS := -specs=ds_arm9.specs -g $(ARCH) -Wl,--gc-sections
-LIBS := -lnds9
+
 LIBDIRS := $(LIBNDS) $(PORTLIBS)
+export LIBPATHS := $(foreach dir,$(LIBDIRS),-L$(dir)/lib)
+
+# Use the known archive directly so resolving -lnds9 doesn't depend on
+# the linker's library search path.
+LIBS := $(LIBNDS)/lib/libnds9.a
 
 .PHONY: all clean
 all: generated/sprites.h $(TARGET).nds
