@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+"""Convert JerryClicker PNG files into NDS-friendly raw sprite data.
+
+This script intentionally uses the repo's actual sprite assets instead of creating placeholders.
+It reads the original PNGs from the JerryClicker project and writes a generated sprite atlas
+that the DS build can consume.
+"""
+
+import argparse
+import json
+from pathlib import Path
+from PIL import Image
+
+
+def convert_png_to_rgb565(image: Image.Image) -> bytes:
+    """Convert a PIL image to a raw RGB565 byte stream suitable for NDS use."""
+    img = image.convert("RGBA")
+    data = bytearray()
+    for y in range(img.height):
+        for x in range(img.width):
+            r, g, b, a = img.getpixel((x, y))
+            if a == 0:
+                r = g = b = 0
+            rgb = ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3)
+            data.append((rgb >> 8) & 0xFF)
+            data.append(rgb & 0xFF)
+    return bytes(data)
+
+
+def collect_asset_files(root: Path, asset_roots: list[Path]) -> list[tuple[str, Path]]:
+    selected: list[tuple[str, Path]] = []
+    seen: set[Path] = set()
+    for base in asset_roots:
+        for path in sorted(base.rglob("*.png")):
+            if path in seen:
+                continue
+            seen.add(path)
+            rel = path.relative_to(root)
+            selected.append((rel.as_posix(), path))
+    return selected
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Convert JerryClicker PNG sprites for NDS build")
+    parser.add_argument("repo_root", type=Path, help="Root directory of the JerryClicker repo")
+    parser.add_argument("asset_roots", nargs="*", type=Path, help="Directories or files to scan for sprite PNGs")
+    parser.add_argument("--out", type=Path, default=Path("nds/build/generated"), help="Output directory for generated sprite files")
+    args = parser.parse_args()
+
+    base_root = args.repo_root.resolve()
+    asset_roots = [p.resolve() for p in args.asset_roots or [base_root / "assets" / "img", base_root / "api" / "resources"]]
+    out_dir = (base_root / args.out).resolve() if not args.out.is_absolute() else args.out.resolve()
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    manifest = []
+    for rel_name, asset_path in collect_asset_files(base_root, asset_roots):
+        with Image.open(asset_path) as img:
+            converted = convert_png_to_rgb565(img)
+            out_file = out_dir / (Path(rel_name).with_suffix(".raw")).name
+            out_file.write_bytes(converted)
+            manifest.append({
+                "source": rel_name,
+                "generated": out_file.name,
+                "width": img.width,
+                "height": img.height,
+            })
+
+    (out_dir / "sprite_manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    print(f"Converted {len(manifest)} sprite files to {out_dir}")
+
+
+if __name__ == "__main__":
+    main()
