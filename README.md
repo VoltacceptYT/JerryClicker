@@ -2,7 +2,7 @@
 
 Port of [JerryClicker](https://github.com/) to the Nintendo DS using devkitARM + libnds.
 The original sprites are used for Jerry, the power-up, the floating candy and every upgrade icon.
-All UI (panels, buttons, stats) is plain text drawn with the built-in console font.
+The UI uses the original Jerrified Pixels font and the original UI sprites (stone background, buttons, locked overlay), software-rendered on both screens.
 
 ## Controls
 | Input | Action |
@@ -20,6 +20,6 @@ Saves go to `JerryClicker.sav` next to the ROM on a flashcart/SD (needs DLDI/FAT
 Push to GitHub; the workflow in `.github/workflows/build.yml` builds `JerryClicker.nds` and uploads it as an artifact.
 Locally: `make` with devkitARM and `nds-dev` installed.
 
-To change sprites, edit `assets/` and run `python3 tools/convert_assets.py` (needs Pillow); it regenerates `source/sprites.c`.
+To change sprites or the font, edit `assets/` and run `python3 tools/convert_assets.py` (needs Pillow); it regenerates `source/sprites.c` and `source/gfxdata.c`.
 
 Upgrade prices grow by `COST_GROWTH` (1.15, in `source/game.h`) per purchase.
