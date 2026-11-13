@@ -17,6 +17,7 @@ CFLAGS := -g -Wall -O2 -ffunction-sections -fdata-sections $(ARCH) -DARM9 -D__ND
           -I$(LIBNDS)/include -I$(CALICO)/include
 LIBDIRS := -L$(LIBNDS)/lib -L$(CALICO)/lib
 LIBS    := -lfat -lnds9
+LIBM    := -lm
 
 # Find the ARM9 linker specs (name/location differs between libnds versions)
 SPECFILE := $(firstword $(wildcard \
@@ -37,9 +38,11 @@ endif
 
 # Default ARM7 core
 ARM7 := $(firstword $(wildcard \
+    $(CALICO)/bin/ds7_maine.elf \
     $(CALICO)/bin/ds7_maxmod.elf \
     $(CALICO)/bin/ds7.elf \
-    $(LIBNDS)/default.elf))
+    $(LIBNDS)/default.elf \
+    $(CALICO)/bin/ds7_*.elf))
 
 SOURCES := $(wildcard $(SRCDIR)/*.c)
 OBJECTS := $(patsubst $(SRCDIR)/%.c,$(BUILD)/%.o,$(SOURCES))
@@ -55,7 +58,7 @@ $(BUILD)/%.o: $(SRCDIR)/%.c
 	$(CC) -MMD -MP $(CFLAGS) -c $< -o $@
 
 $(TARGET).elf: $(OBJECTS)
-	$(CC) $(ARCH) $(SPECS) -Wl,--gc-sections -Wl,-Map,$(TARGET).map $(OBJECTS) $(LIBDIRS) $(LIBS) -o $@
+	$(CC) $(ARCH) $(SPECS) -Wl,--gc-sections -Wl,-Map,$(TARGET).map $(OBJECTS) $(LIBDIRS) -Wl,--start-group $(LIBS) -Wl,--end-group $(LIBM) -o $@
 
 $(TARGET).nds: $(TARGET).elf icon.bmp
 	@test -n "$(ARM7)" || (echo "ERROR: could not find default ARM7 core"; exit 1)
