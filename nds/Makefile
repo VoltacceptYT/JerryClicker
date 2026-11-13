@@ -21,6 +21,9 @@ ASFLAGS := $(ARCH)
 LDFLAGS := -specs=ds_arm9.specs -g $(ARCH) -Wl,--gc-sections
 LIBS := -lnds9
 
+LIBNDS ?= $(DEVKITPRO)/libnds
+LIBDIRS := $(LIBNDS)/lib
+
 .PHONY: all clean
 all: generated/sprites.h $(TARGET).nds
 
