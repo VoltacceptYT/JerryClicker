@@ -1,36 +1,31 @@
-# Nintendo DS project configuration
-
+# devkitPro / devkitARM libnds project
 DEVKITPRO ?= /opt/devkitpro
-include $(DEVKITPRO)/base_tools
+DEVKITARM ?= $(DEVKITPRO)/devkitARM
 
-TARGET := jerryclicker_nds
-BUILD_DIR := build
-SRC_DIR := source
-TOOLS_DIR := tools
+TARGET := jerryclicker
+BUILD := build
+SOURCES := source
+DATA :=
+INCLUDES := -Igenerated
 
-CXX := arm-none-eabi-g++
-CFLAGS := -MMD -MP -Wall -O2 -marm -march=armv5te -mtune=arm946e-s -fomit-frame-pointer -ffunction-sections -fdata-sections
-INCLUDES := -I$(DEVKITPRO)/libnds/include -I$(DEVKITPRO)/libfat/include -I$(DEVKITPRO)/libgba/include
-LDFLAGS := -specs=nds.specs -L$(DEVKITPRO)/libnds/lib -L$(DEVKITPRO)/libfat/lib -L$(DEVKITPRO)/libgba/lib
-LDLIBS := -lnds9 -lfat -lmm7 -lmm9
-
-SOURCES := $(wildcard $(SRC_DIR)/*.cpp)
-OBJECTS := $(patsubst $(SRC_DIR)/%.cpp,$(BUILD_DIR)/%.o,$(SOURCES))
-
-all: $(BUILD_DIR)/$(TARGET).nds
-
-$(BUILD_DIR):
-	mkdir -p $(BUILD_DIR)
-
-$(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp | $(BUILD_DIR)
-	$(CXX) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-$(BUILD_DIR)/$(TARGET).nds: $(OBJECTS)
-	$(CXX) $(LDFLAGS) -o $(BUILD_DIR)/$(TARGET).elf $(OBJECTS) $(LDLIBS)
-	arm-none-eabi-objcopy -O binary $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET).bin
-	ndstool -c $(BUILD_DIR)/$(TARGET).nds -9 $(BUILD_DIR)/$(TARGET).bin -b $(BUILD_DIR)/$(TARGET).bmp
-
-clean:
-	rm -rf $(BUILD_DIR)
+ARCH := -mthumb -mthumb-interwork -march=armv5te -mtune=arm946e-s
+CFLAGS := -g -Wall -O2 -ffunction-sections -fdata-sections $(ARCH)
+CXXFLAGS := $(CFLAGS) -fno-rtti -fno-exceptions
+ASFLAGS := $(ARCH)
+LDFLAGS := -specs=ds_arm9.specs -g $(ARCH) -Wl,--gc-sections
+LIBS := -lnds9
 
 .PHONY: all clean
+all: generated/sprites.h $(TARGET).nds
+
+# Generated sprite data is compiled into the ROM; no FAT setup is needed at runtime.
+generated/sprites.h: tools/convert_sprites.py
+	python3 tools/convert_sprites.py .. --out nds/generated
+
+$(TARGET).elf: generated/sprites.h
+
+include $(DEVKITARM)/ds_rules
+
+clean:
+	$(MAKE) -f $(DEVKITARM)/ds_rules clean
+	rm -f $(TARGET).nds generated/sprites.h generated/sprite_manifest.json

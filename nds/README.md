@@ -1,35 +1,31 @@
-# JerryClicker NDS Port
+# Jerry Clicker — Nintendo DS
 
-This project turns the existing JerryClicker web game into a Nintendo DS build using the repository's real sprite assets.
+A native libnds port of the browser clicker, built with devkitPro's supported `ds_rules` make rules. The port uses the original repository PNG sprites: Jerry and cosmetic variants, Golden Jerry, upgrade icons, candy, and UI buttons.
 
-What is included:
-- A libnds-based project skeleton for the DS
-- A sprite conversion tool that reads the actual PNGs from this repository
-- A playable DS-style clicker loop with Jerry, upgrades, and Golden Jerry events
-- A build process that regenerates the sprite header before compilation
+## Build toolchain
 
-Structure:
-- `nds/Makefile` — build configuration
-- `nds/source/main.cpp` — DS game logic and rendering
-- `nds/tools/convert_sprites.py` — converts repo PNGs into generated C sprite data
-- `nds/generated/` — generated output created during the build
+Tested configuration target: devkitPro/devkitARM + libnds (ARM9). Install Python 3 and Pillow as well:
 
-Requirements:
-- devkitPro / libnds installed at `/opt/devkitpro` or adjust `DEVKITPRO` in the Makefile
-- Python 3 with Pillow (`python3 -m pip install pillow`)
+```sh
+python3 -m pip install Pillow
+```
 
-Build:
+Set `DEVKITPRO` if it is not `/opt/devkitpro`, then build from this directory:
 
-```bash
-cd nds
+```sh
+make clean
 make
 ```
 
-The build will automatically run the sprite conversion script, read the source PNGs from the repo, and generate `generated/sprites.h` before compiling.
+The build runs `tools/convert_sprites.py` to generate `generated/sprites.h`, compiles the ARM9 application with `$(DEVKITARM)/ds_rules`, and emits `jerryclicker.nds`. If the sprite conversion dependency is unavailable, install Pillow in the Python environment used by `make`.
 
-Run:
-- Use an emulator like melonDS, DeSmuME, or a real Nintendo DS.
+## Controls
 
-Notes:
-- This project uses the repo's real Jerry assets rather than custom placeholders.
-- The DS app keeps the clicker loop lightweight and portable: tap Jerry to gain candies, buy upgrades, and catch Golden Jerry for a burst of currency.
+- Touch Jerry on the top screen or press **A** to earn candies.
+- Tap Golden Jerry when it appears for a random windfall, frenzy, or lucky bonus.
+- On the lower screen, tap an upgrade row to purchase it. Use **L/R** to change pages and **X** to buy the selected row.
+- The game includes the browser game's upgrade costs/effects, auto-generation, cosmetic selection, prestige unlock, signature multiplier, and prestige reset progression.
+
+## Notes
+
+The game is a native port, not a browser wrapper. The sprite converter preserves alpha as the DS bitmap transparency bit and reduces source colors to DS RGB15. Generated output is ignored by git and recreated by `make`. The ARM9 build needs no filesystem at runtime.
