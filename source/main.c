@@ -116,6 +116,8 @@ static void setup(void) {
 
     int bgT = bgInit(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
     int bgB = bgInitSub(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
+    bgSetPriority(bgT, 3);
+    bgSetPriority(bgB, 3);
     vramTop = bgGetGfxPtr(bgT);
     vramBot = bgGetGfxPtr(bgB);
 
@@ -171,24 +173,24 @@ static void update_sprites(void) {
     int wobble;
     int v = jerry_variant(&wobble);
     int dy = pressFrames > 0 ? 3 : 0;
-    oamSet(&oamSub, 0, UI_JERRY_X + wobble, UI_JERRY_Y + dy, 1, 0, SpriteSize_64x64,
+    oamSet(&oamSub, 5, UI_JERRY_X + wobble, UI_JERRY_Y + dy, 0, 0, SpriteSize_64x64,
            SpriteColorFormat_256Color, jerryGfx[v], -1, false, false, false, false, false);
 
     for (int i = 0; i < FLOATERS; i++) {
         if (floaters[i].on) {
-            oamSet(&oamSub, 1 + i, floaters[i].x, floaters[i].y, 0, 0, SpriteSize_16x16,
+            oamSet(&oamSub, i, floaters[i].x, floaters[i].y, 0, 0, SpriteSize_16x16,
                    SpriteColorFormat_256Color, candyGfx, -1, false, false, false, false, false);
         } else {
-            hide_sub(1 + i, SpriteSize_16x16, candyGfx);
+            hide_sub(i, SpriteSize_16x16, candyGfx);
         }
     }
 
     if (goldenOn) {
         static const int bob[4] = {0, -2, -4, -2};
-        oamSet(&oamSub, 5, goldenX, goldenY + bob[(frame >> 3) & 3], 0, 0, SpriteSize_32x32,
+        oamSet(&oamSub, 4, goldenX, goldenY + bob[(frame >> 3) & 3], 0, 0, SpriteSize_32x32,
                SpriteColorFormat_256Color, goldenGfx, -1, false, false, false, false, false);
     } else {
-        hide_sub(5, SpriteSize_32x32, goldenGfx);
+        hide_sub(4, SpriteSize_32x32, goldenGfx);
     }
 }
 
