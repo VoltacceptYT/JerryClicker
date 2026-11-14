@@ -4,6 +4,8 @@ Port of [JerryClicker](https://github.com/VoltacceptYT/JerryClicker/) to the Nin
 The original sprites are used for Jerry, the power-up, the floating candy and every upgrade icon.
 The UI uses the original Jerrified Pixels font and the original UI sprites (stone background, buttons, locked overlay), software-rendered on both screens.
 
+> Looking for another version? See the [`main` branch](https://github.com/VoltacceptYT/JerryClicker) for the table of contents
+
 ## Controls
 | Input | Action |
 |---|---|
@@ -21,6 +23,8 @@ Saves go to `JerryClicker.sav` next to the ROM on a flashcart/SD (needs DLDI/FAT
 | Device/Emu | Tested | Tester |
 |---|---|---|
 | DS Lite | Works | VoltacceptYT |
+| MelonDS | Works | Emarxian |
+| DeSmuME | Failed | Emarxian |
 
 
 Any Device **NOT** listed hasn't been tested yet 
