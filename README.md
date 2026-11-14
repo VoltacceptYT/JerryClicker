@@ -28,3 +28,11 @@ Upgrade prices grow by `COST_GROWTH` (1.15, in `source/game.h`) per purchase.
 ## Music
 `assets/music/JerryUnited.mp3` is converted to the DS hardware's native IMA-ADPCM format (mono, 22.05 kHz, ~1.4 MiB) and embedded in the ROM via `source/music_data.s`. It loops on one ARM7 sound voice through `soundPlaySample`, so it costs the ARM9 nothing and needs no maxmod/soundbank.
 To change the track or quality: `python3 tools/convert_music.py --rate 22050` (needs ffmpeg + numpy; 16000 = smaller, 32000 = better but ~2.2 MiB). The generated `.adpcm` and `source/music_info.h` are not committed: the GitHub Actions workflow runs the converter before `make`, and local builds need to run it once first.
+
+## Credits
+- **Game:** VoltacceptYT
+- **Sprites:** Mojang / VoltacceptYT
+- **Music:** VO!DWiNG
+
+### Other Thanks
+- **devkitPro** - Compiler
