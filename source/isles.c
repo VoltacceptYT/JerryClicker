@@ -1,8 +1,10 @@
 #include "isles.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "daycycle.h"
 #include "gfxdata.h"
 #include "islanddata.h"
 
@@ -56,8 +58,61 @@ static const Decor DECOR[] = {
 };
 #define DECOR_COUNT ((int)(sizeof(DECOR) / sizeof(DECOR[0])))
 
-static px *bgBuf;
+static px *bgBuf;                 // untinted terrain, built once
+static px tintBuf[SCREEN_W * SCREEN_H] __attribute__((aligned(32)));  // bgBuf tinted for the time of day
 static uint8_t walk[ROWS][COLS];  // 1 = critters may stand here
+
+/* ---------------- Day/night tint ----------------
+ * The light follows the real clock (daycycle.c). Tinting every pixel each frame is too slow for the
+ * ARM9, so the terrain is tinted once into tintBuf whenever the light has moved enough to see, and the
+ * sprites (decor and critters) are tinted through the same lookup tables as they are drawn. Each table
+ * maps a 5-bit channel value straight to its tinted value, already shifted into place in the pixel. */
+static uint16_t lutR[32], lutG[32], lutB[32];
+static bool tintIdentity = true;  // full daylight: nothing to do
+static bool tintSprites;          // set while isles_draw() runs; off while the terrain is being built
+static DayTint bakedTint = {256, 256, 256};
+static bool tintBaked;
+
+static inline px tint_px(px v) {
+    return (px)(0x8000 | lutR[v & 31] | lutG[(v >> 5) & 31] | lutB[(v >> 10) & 31]);
+}
+
+static void build_lut(uint16_t *lut, int mul, int shift) {
+    for (int i = 0; i < 32; i++) {
+        int v = (i * mul + 128) >> 8;
+        lut[i] = (uint16_t)((v > 31 ? 31 : v) << shift);
+    }
+}
+
+static void bake_tint(DayTint t) {
+    bakedTint = t;
+    tintBaked = true;
+    tintIdentity = t.r >= 256 && t.g >= 256 && t.b >= 256;
+    if (tintIdentity) {
+        memcpy(tintBuf, bgBuf, sizeof tintBuf);
+        return;
+    }
+    build_lut(lutR, t.r, 0);
+    build_lut(lutG, t.g, 5);
+    build_lut(lutB, t.b, 10);
+    for (int i = 0; i < SCREEN_W * SCREEN_H; i++) tintBuf[i] = tint_px(bgBuf[i]);
+}
+
+static int tint_delta(DayTint a, DayTint b) {
+    int dr = (int)a.r - (int)b.r, dg = (int)a.g - (int)b.g, db = (int)a.b - (int)b.b;
+    if (dr < 0) dr = -dr;
+    if (dg < 0) dg = -dg;
+    if (db < 0) db = -db;
+    return dr > dg ? (dr > db ? dr : db) : (dg > db ? dg : db);
+}
+
+void isles_update_clock(void) {
+    if (!bgBuf) return;
+    DayTint t = daycycle_tint();
+    // Re-bake only once the light has moved by 4/256 or more on some channel: far below what the
+    // eye can pick out in 5-bit colour, and it spaces the re-bakes minutes apart during dawn/dusk.
+    if (!tintBaked || tint_delta(t, bakedTint) >= 4) bake_tint(t);
+}
 
 static inline int foot_x(const Decor *d) { return d->cx * 16 + 8 + d->offx; }
 static inline int foot_y(const Decor *d) { return SCENE_Y + d->cy * 16 + 12; }
@@ -93,7 +148,7 @@ static void blit_obj(Canvas *c, const ObjSprite *o, int x, int y) {
             uint16_t v = o->px[yy * o->w + xx];
             px *dst = &c->buf[py * SCREEN_W + pxx];
             if (v & 0x8000) {
-                *dst = v;
+                *dst = (tintSprites && !tintIdentity) ? tint_px(v) : v;
             } else if (v == 1) {
                 uint16_t d = *dst & 0x7FFF;
                 *dst = 0x8000 | (((d >> 1) & 0x3DEF) + ((d >> 2) & 0x1CE7));
@@ -111,6 +166,20 @@ static void shade_ellipse(Canvas *c, int cx, int cy) {  // small blob shadow und
             if (x < c->cx0 || x >= c->cx1) continue;
             uint16_t d = c->buf[y * SCREEN_W + x] & 0x7FFF;
             c->buf[y * SCREEN_W + x] = 0x8000 | (((d >> 1) & 0x3DEF) + ((d >> 2) & 0x1CE7));
+        }
+    }
+}
+
+// Same as gfx_blit16 (no blending) but through the day/night tint.
+static void blit16_tint(Canvas *c, const uint16_t *tex, int x, int y) {
+    for (int yy = 0; yy < 16; yy++) {
+        int py = y + yy;
+        if (py < c->cy0 || py >= c->cy1) continue;
+        for (int xx = 0; xx < 16; xx++) {
+            int pxx = x + xx;
+            if (pxx < c->cx0 || pxx >= c->cx1) continue;
+            uint16_t v = tex[yy * 16 + xx];
+            if (v & 0x8000) c->buf[py * SCREEN_W + pxx] = tint_px(v);
         }
     }
 }
@@ -429,6 +498,20 @@ static void draw_emote(Canvas *c, const Critter *k, int x, int y) {
     draw_bits(c, rows, h, w, x - w / 2, y, col);
 }
 
+// The time of day, painted on the bench's seat like part of the sprite: dark wood-stain letters with a
+// light edge below, tinted by the day/night light exactly like the bench itself.
+static void draw_bench_clock(Canvas *c, const Decor *d) {
+    const ObjSprite *o = &isl_objs[d->obj];
+    char t[16];
+    daycycle_time_string(t, sizeof t);
+    int x = foot_x(d) - o->ax + (o->w - gfx_text_width(&font10, t)) / 2;
+    int y = foot_y(d) - o->ay + (o->h - font10.height) / 2;
+    px dark = RGB8(62, 34, 26), edge = RGB8(176, 120, 92);
+    if (!tintIdentity) { dark = tint_px(dark); edge = tint_px(edge); }
+    gfx_text(c, &font10, x + 1, y + 1, t, edge, 0);
+    gfx_text(c, &font10, x, y, t, dark, 0);
+}
+
 typedef struct { int16_t y; uint8_t kind, id; } DrawItem;  // kind 0 = decor, 1 = critter
 
 void isles_draw(Canvas *c) {
@@ -436,6 +519,7 @@ void isles_draw(Canvas *c) {
     static const uint8_t walkTab[4] = {0, 1, 2, 1};
     DrawItem items[ISL_MAX_CRITTERS + DECOR_COUNT];
     int n = 0;
+    tintSprites = true;
     for (int i = 0; i < DECOR_COUNT; i++)
         if (DECOR[i].flags & DEC_DYN) {
             items[n].y = (int16_t)foot_y(&DECOR[i]); items[n].kind = 0; items[n].id = (uint8_t)i; n++;
@@ -457,6 +541,7 @@ void isles_draw(Canvas *c) {
             const Decor *d = &DECOR[items[a].id];
             const ObjSprite *o = &isl_objs[d->obj];
             blit_obj(c, o, foot_x(d) - o->ax, foot_y(d) - o->ay);
+            if (d->obj == OBJ_BENCH) draw_bench_clock(c, d);
             continue;
         }
         int id = items[a].id;
@@ -467,8 +552,10 @@ void isles_draw(Canvas *c) {
         else if (k->state == ST_WALK || (k->state == ST_FOLLOW && k->vx)) up = walkTab[((frameNo >> 3) + id) & 3];
         lift[id] = up;
         shade_ellipse(c, x, y - 1);
-        gfx_blit16(c, icon_rgb[k->up], x - 8, y - 15 - up, 0);
+        if (tintIdentity) gfx_blit16(c, icon_rgb[k->up], x - 8, y - 15 - up, 0);
+        else blit16_tint(c, icon_rgb[k->up], x - 8, y - 15 - up);
     }
+    tintSprites = false;  // emotes and the hint panel stay bright so they read at night
     for (int a = 0; a < n; a++)  // emotes on top of everything
         if (items[a].kind == 1) {
             int id = items[a].id;
@@ -476,9 +563,9 @@ void isles_draw(Canvas *c) {
         }
 
     if (isles_critter_count() == 0) {
-        gfx_bevel_panel(c, 34, 154, 188, 28, RGB8(34, 34, 34), RGB8(85, 85, 85), RGB8(0, 0, 0));
-        gfx_text_centered(c, &font10, 128, 158, "BUY 5 OF AN UPGRADE TO", RGB8(255, 255, 255), 1);
-        gfx_text_centered(c, &font10, 128, 169, "POPULATE THE ISLES", RGB8(255, 255, 255), 1);
+        gfx_bevel_panel(c, 34, 120, 188, 28, RGB8(34, 34, 34), RGB8(85, 85, 85), RGB8(0, 0, 0));
+        gfx_text_centered(c, &font10, 128, 124, "BUY 5 OF AN UPGRADE TO", RGB8(255, 255, 255), 1);
+        gfx_text_centered(c, &font10, 128, 135, "POPULATE THE ISLES", RGB8(255, 255, 255), 1);
     }
 }
 
@@ -489,6 +576,8 @@ void isles_init(px *bg, uint32_t seed) {
     rngState = seed ? seed : 0x1234567u;
     memset(crit, 0, sizeof crit);
     build_terrain();
+    tintBaked = false;
+    isles_update_clock();
 }
 
-const px *isles_bg(void) { return bgBuf; }
+const px *isles_bg(void) { return bgBuf ? tintBuf : NULL; }

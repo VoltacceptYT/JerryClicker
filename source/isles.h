@@ -13,6 +13,9 @@
 // Builds the static terrain into bgBuf (SCREEN_W x SCREEN_H) and resets the simulation.
 void isles_init(px *bgBuf, uint32_t seed);
 const px *isles_bg(void);
+// Re-reads the day/night cycle (see daycycle.h) and re-tints the island when the light has shifted
+// noticeably. Cheap; call about once a second, whichever page is showing.
+void isles_update_clock(void);
 // Call whenever purchase counts change (buy, prestige, load).
 void isles_sync(const Game *g);
 // One simulation step (60/s). Only needed while the page is visible.

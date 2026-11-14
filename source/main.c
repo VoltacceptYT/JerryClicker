@@ -11,6 +11,7 @@
 #include <time.h>
 
 #include "audio.h"
+#include "daycycle.h"
 #include "game.h"
 #include "gfx.h"
 #include "isles.h"
@@ -139,6 +140,7 @@ static void setup(void) {
     if (candyGfx) upload(candy_gfx, candyGfx, 256);
 
     ui_draw_backgrounds(bgTopBuf, bgBotBuf);
+    daycycle_update();  // read the DS clock before the island bakes its first tint
     isles_init(bgIsleBuf, (uint32_t)time(NULL));
     keysSetRepeat(15, 4);
 }
@@ -392,6 +394,12 @@ int main(void) {
                 }
                 dirtyTop = dirtyBot = true;
             }
+        }
+
+        // Day/night cycle: follow the DS real-time clock (checked once a second)
+        if (frame % 60 == 0) {
+            daycycle_update();
+            isles_update_clock();
         }
 
         // Simulation

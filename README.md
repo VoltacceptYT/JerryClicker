@@ -23,6 +23,10 @@ Saves go to `JerryClicker.sav` next to the ROM on a flashcart/SD (needs DLDI/FAT
 ## Jerry Isles
 The second top-screen page is a tiled island (autotiled from `assets/island/island_tiles.png`: sea, sand, grass, palms, rocks, shells) filling the whole screen under the header. Every 5 purchases of an upgrade add one wandering critter wearing that upgrade's icon (up to 48 at once, shared fairly between upgrades). Critters stay on land, walk around palms, rocks and the bench, drift toward the parasol and palms, bump into each other, and greet each other (hearts for the same upgrade, a note for different ones); sometimes one follows the other around. They disappear on prestige along with the purchases.
 
+## Day/night cycle
+Like Pokemon HeartGold/SoulSilver, the Jerry Isles follow the DS's real-time clock, so it is evening on the island when it is evening in real life. The periods use HGSS's boundaries (**Morning** 4:00-9:59, **Day** 10:00-17:59, **Night** 18:00-3:59) and the time of day is painted on the bench at the bottom of the Isles page. Instead of snapping between three looks, the light blends smoothly through lilac first light, a peach sunrise, full daylight, an orange sunset, purple dusk and a blue night (the keyframes are the `KEYS` table in `source/daycycle.c`).
+The terrain is re-tinted only when the light has shifted visibly (every few minutes at dawn/dusk, never in full daylight) and sprites are tinted as they are drawn, so it costs almost nothing. Set the clock in the DS settings (or your emulator) to change the time. To preview the whole cycle, set `DAYCYCLE_PREVIEW` to `1` in `source/daycycle.h`: the clock then runs 1800x faster (a full day in ~48 s).
+
 ## Tested Devices/Emulators
 | Device/Emu | Tested | Tester |
 |---|---|---|
