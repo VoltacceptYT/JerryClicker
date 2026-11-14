@@ -17,6 +17,14 @@ The UI uses the original Jerrified Pixels font and the original UI sprites (ston
 
 Saves go to `JerryClicker.sav` next to the ROM on a flashcart/SD (needs DLDI/FAT). Without storage the game still runs, it just can't save.
 
+## Tested Devices/Emulators
+| Device/Emu | Tested | Tester |
+|---|---|---|
+| DS Lite | Works | VoltacceptYT |
+
+
+Any Device **NOT** listed hasn't been tested yet 
+
 ## Building
 Push to GitHub; the workflow in `.github/workflows/Build.yml` converts the graphics and music and builds `JerryClicker.nds` and uploads it as an artifact.
 Locally: run `python3 tools/convert_music.py` once (see Music), then `make` with devkitARM and `nds-dev` installed.
