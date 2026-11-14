@@ -42,6 +42,7 @@ static bool confirmPrestige = false;
 
 // Jerry
 static int pressFrames = 0;
+static int pressedBtn = 0; // bottom-screen button currently held by the stylus (0 none, 1 left, 2 right)
 
 // Floating candies
 #define FLOATERS 4
@@ -150,6 +151,7 @@ static void make_view(UiView *v) {
     v->msgTimer = msgTimer;
     v->saveStatus = saveStatus;
     v->fatOk = fatOk;
+    v->pressedBtn = pressedBtn;
 }
 
 static void hide_sub(int id, SpriteSize size, u16 *gfx) {
@@ -312,6 +314,18 @@ int main(void) {
         memset(&t, 0, sizeof t);
         bool touched = (down & KEY_TOUCH) != 0;
         if (touched) touchRead(&t);
+
+        // Which button (if any) is the stylus currently holding down?
+        int heldBtn = 0;
+        if (keysHeld() & KEY_TOUCH) {
+            touchPosition h;
+            touchRead(&h);
+            if (h.py >= UI_BTN_Y && h.py < UI_BTN_Y + UI_BTN_H) heldBtn = h.px < 128 ? 1 : 2;
+        }
+        if (heldBtn != pressedBtn) {
+            pressedBtn = heldBtn;
+            dirtyBot = true;
+        }
 
         if (confirmPrestige) {
             bool yes = (down & KEY_A) || (touched && t.py >= UI_BTN_Y && t.px < 128);

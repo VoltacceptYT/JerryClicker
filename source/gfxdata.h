@@ -12,6 +12,10 @@ extern const uint16_t tex_ok[256];
 extern const uint16_t tex_cancel[256];
 extern const uint16_t tex_prestige[256];
 extern const uint16_t tex_locked[256];
+extern const uint16_t tex_button_active[256];
+extern const uint16_t tex_ok_active[256];
+extern const uint16_t tex_cancel_active[256];
+extern const uint16_t tex_prestige_active[256];
 extern const uint16_t icon_rgb[ICON_COUNT][256]; /* 16x16 ARGB1555 */
 extern const uint16_t candy_rgb[256];
 #endif

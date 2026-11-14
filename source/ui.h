@@ -25,6 +25,7 @@ typedef struct {
     int msgTimer;
     const char *saveStatus;
     bool fatOk;
+    int pressedBtn; // 0 = none, 1 = left button held, 2 = right button held
 } UiView;
 
 void ui_draw_backgrounds(px *topBg, px *botBg); // static stone textures

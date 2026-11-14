@@ -102,9 +102,10 @@ void ui_draw_top(px *fb, const px *bg, const UiView *v) {
     gfx_text(&c, &font10, 8, 177, "A BUY  B TAP  L/R PAGE  START PRESTIGE", C_DIM, 0);
 }
 
-static void button(Canvas *c, const uint16_t *tex, int x, const char *label, px color) {
-    gfx_nineslice(c, tex, x, UI_BTN_Y, UI_BTN_W, UI_BTN_H);
-    gfx_text_centered(c, &font10, x + UI_BTN_W / 2, UI_BTN_Y + 8, label, color, 1);
+// pressed: draw the _active texture and nudge the label down 1px
+static void button(Canvas *c, const uint16_t *tex, const uint16_t *texActive, int x, const char *label, px color, bool pressed) {
+    gfx_nineslice(c, pressed ? texActive : tex, x, UI_BTN_Y, UI_BTN_W, UI_BTN_H);
+    gfx_text_centered(c, &font10, x + UI_BTN_W / 2, UI_BTN_Y + 8 + (pressed ? 1 : 0), label, color, 1);
 }
 
 void ui_draw_bottom(px *fb, const px *bg, const UiView *v) {
@@ -153,10 +154,10 @@ void ui_draw_bottom(px *fb, const px *bg, const UiView *v) {
 
     // Buttons
     if (v->confirmPrestige) {
-        button(&c, tex_ok, UI_BTN_L_X, "YES", C_WHITE);
-        button(&c, tex_cancel, UI_BTN_R_X, "NO", C_WHITE);
+        button(&c, tex_ok, tex_ok_active, UI_BTN_L_X, "YES", C_WHITE, v->pressedBtn == 1);
+        button(&c, tex_cancel, tex_cancel_active, UI_BTN_R_X, "NO", C_WHITE, v->pressedBtn == 2);
     } else {
-        button(&c, tex_button, UI_BTN_L_X, v->fatOk ? "SAVE" : "NO SD", v->fatOk ? C_WHITE : C_DIM);
-        button(&c, tex_prestige, UI_BTN_R_X, "PRESTIGE", game_can_prestige(g) ? C_WHITE : RGB8(190, 170, 220));
+        button(&c, tex_button, tex_button_active, UI_BTN_L_X, v->fatOk ? "SAVE" : "NO SD", v->fatOk ? C_WHITE : C_DIM, v->pressedBtn == 1);
+        button(&c, tex_prestige, tex_prestige_active, UI_BTN_R_X, "PRESTIGE", game_can_prestige(g) ? C_WHITE : RGB8(190, 170, 220), v->pressedBtn == 2);
     }
 }

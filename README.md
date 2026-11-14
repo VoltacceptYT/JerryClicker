@@ -21,7 +21,7 @@ Saves go to `JerryClicker.sav` next to the ROM on a flashcart/SD (needs DLDI/FAT
 Push to GitHub; the workflow in `.github/workflows/Build.yml` converts the graphics and music and builds `JerryClicker.nds` and uploads it as an artifact.
 Locally: run `python3 tools/convert_music.py` once (see Music), then `make` with devkitARM and `nds-dev` installed.
 
-To change sprites or the font, edit `assets/` and run `python3 tools/convert_assets.py` (needs Pillow); it regenerates `source/sprites.c`, `source/gfxdata.c` and `icon.bmp`. The workflow runs it too, and the generated files stay committed so local builds work without it.
+To change sprites or the font, edit `assets/` (buttons use `ui/<name>.png` plus a `ui/<name>_active.png` pressed variant) and run `python3 tools/convert_assets.py` (needs Pillow); it regenerates `source/sprites.c`, `source/gfxdata.c` and `icon.bmp`. The workflow runs it too, and the generated files stay committed so local builds work without it.
 
 Upgrade prices grow by `COST_GROWTH` (1.15, in `source/game.h`) per purchase.
 

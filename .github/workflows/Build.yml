@@ -12,18 +12,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Tools
+      - name: Install conversion tools
         run: |
           apt-get update
           apt-get install -y --no-install-recommends ffmpeg python3-numpy python3-pil
 
-      - name: Convert Assets
+      - name: Convert graphics and font (PNG/TTF -> C arrays, icon.bmp)
         run: python3 tools/convert_assets.py
 
-      - name: Convert Music
+      - name: Convert audio (MP3 -> DS ADPCM)
         run: python3 tools/convert_music.py --rate 22050
 
-      - name: Toolchain Layout (diagnostics)
+      - name: Toolchain layout (diagnostics)
         run: |
           echo "DEVKITPRO=$DEVKITPRO DEVKITARM=$DEVKITARM"
           make info

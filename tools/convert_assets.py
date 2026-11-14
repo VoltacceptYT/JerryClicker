@@ -133,7 +133,11 @@ def make_gfxdata(icons, candy):
         hdr.append("extern const Font %s;" % name)
     texs = {"tex_stone": "ui/stone", "tex_button": "ui/button", "tex_ok": "ui/button_ok",
             "tex_cancel": "ui/button_cancel", "tex_prestige": "ui/button_prestige",
-            "tex_locked": "ui/locked"}
+            "tex_locked": "ui/locked",
+            # pressed variants (<name>_active.png), drawn while the button is held
+            "tex_button_active": "ui/button_active", "tex_ok_active": "ui/button_ok_active",
+            "tex_cancel_active": "ui/button_cancel_active",
+            "tex_prestige_active": "ui/button_prestige_active"}
     for name, rel in texs.items():
         im = load(os.path.join(A, rel + ".png"))
         assert im.size == (16, 16), rel
