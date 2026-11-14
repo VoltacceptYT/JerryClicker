@@ -1,4 +1,5 @@
 #include "ui.h"
+#include "isles.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -28,78 +29,10 @@ static void panel(Canvas *c, int x, int y, int w, int h) {
     gfx_bevel_panel(c, x, y, w, h, RGB8(34, 34, 34), RGB8(85, 85, 85), RGB8(0, 0, 0));
 }
 
-/* ---------------- Jerry Isles page ---------------- */
-
-// The scene fills the whole page below the header.
-#define ISLE_X 3
-#define ISLE_Y 20
-#define ISLE_W 250
-#define ISLE_H 170
-#define ISLE_PER 5          // one sprite per this many purchases of an upgrade
-#define ISLE_MAX_PER 20     // per-upgrade cap so the scene stays fast (= 100 purchases)
-
-typedef struct { int16_t x, y; uint8_t icon; } IsleSprite;
-static IsleSprite isleSprites[UPGRADE_COUNT * ISLE_MAX_PER];
-
-// Stable position hash: the k-th sprite of upgrade i always lands on the same spot.
-static uint32_t isle_hash(uint32_t a, uint32_t b) {
-    uint32_t h = (a + 1) * 0x9E3779B1u ^ (b + 1) * 0x85EBCA6Bu;
-    h ^= h >> 15;
-    h *= 0x2C1B3C6Du;
-    h ^= h >> 12;
-    h *= 0x297A2D39u;
-    h ^= h >> 15;
-    return h;
-}
-
-static void draw_isles(Canvas *c, const Game *g) {
-    // Ground: bevelled frame with a two-tone grass checkerboard.
-    gfx_bevel_panel(c, ISLE_X, ISLE_Y, ISLE_W, ISLE_H, RGB8(52, 130, 52), RGB8(110, 190, 110), RGB8(20, 60, 20));
-    for (int ty = 0; ty < (ISLE_H - 2 + 15) / 16; ty++)
-        for (int tx = 0; tx < (ISLE_W - 2 + 15) / 16; tx++)
-            if ((tx + ty) & 1) {
-                int w = ISLE_W - 2 - tx * 16; if (w > 16) w = 16;
-                int h = ISLE_H - 2 - ty * 16; if (h > 16) h = 16;
-                gfx_fill(c, ISLE_X + 1 + tx * 16, ISLE_Y + 1 + ty * 16, w, h, RGB8(58, 142, 58));
-            }
-
-    // Collect one sprite per ISLE_PER purchases of every upgrade.
-    int n = 0;
-    for (int i = 0; i < UPGRADE_COUNT; i++) {
-        int k = g->s.up[i].count / ISLE_PER;
-        if (k > ISLE_MAX_PER) k = ISLE_MAX_PER;
-        for (int j = 0; j < k; j++) {
-            uint32_t h = isle_hash((uint32_t)i, (uint32_t)j);
-            isleSprites[n].x = ISLE_X + 4 + (int)((h & 0xFFFF) % (ISLE_W - 8 - 16));
-            isleSprites[n].y = ISLE_Y + 4 + (int)((h >> 16) % (ISLE_H - 8 - 16));
-            isleSprites[n].icon = (uint8_t)i;
-            n++;
-        }
-    }
-
-    // Depth sort by y (insertion sort) so lower sprites overlap higher ones.
-    for (int a = 1; a < n; a++) {
-        IsleSprite t = isleSprites[a];
-        int b = a - 1;
-        while (b >= 0 && isleSprites[b].y > t.y) { isleSprites[b + 1] = isleSprites[b]; b--; }
-        isleSprites[b + 1] = t;
-    }
-
-    for (int a = 0; a < n; a++) {
-        gfx_fill(c, isleSprites[a].x + 3, isleSprites[a].y + 14, 10, 2, RGB8(30, 90, 30));
-        gfx_blit16(c, icon_rgb[isleSprites[a].icon], isleSprites[a].x, isleSprites[a].y, 0);
-    }
-
-    if (n == 0) {
-        gfx_text_centered(c, &font10, 128, 98, "THE ISLES ARE EMPTY", C_WHITE, 1);
-        gfx_text_centered(c, &font10, 128, 110, "BUY 5 OF AN UPGRADE TO", C_DIM, 1);
-        gfx_text_centered(c, &font10, 128, 120, "SEE IT APPEAR HERE", C_DIM, 1);
-    }
-}
-
 void ui_draw_top(px *fb, const px *bg, const UiView *v) {
     Canvas c;
-    memcpy(fb, bg, SCREEN_W * SCREEN_H * sizeof(px));
+    const px *base = (v->page == PAGE_ISLES && isles_bg()) ? isles_bg() : bg;
+    memcpy(fb, base, SCREEN_W * SCREEN_H * sizeof(px));
     gfx_begin(&c, fb);
     const Game *g = v->game;
     char a[96], b[96];
@@ -113,7 +46,7 @@ void ui_draw_top(px *fb, const px *bg, const UiView *v) {
     gfx_blit16(&c, candy_rgb, 250 - tw - 18, 1, 0);
 
     if (v->page == PAGE_ISLES) {
-        draw_isles(&c, g);
+        isles_draw(&c);
         return;
     }
 

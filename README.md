@@ -21,7 +21,7 @@ The UI uses the original Jerrified Pixels font and the original UI sprites (ston
 Saves go to `JerryClicker.sav` next to the ROM on a flashcart/SD (needs DLDI/FAT). Without storage the game still runs, it just can't save.
 
 ## Jerry Isles
-The second top-screen page is a scene that fills the whole screen under the header. Every upgrade you own is drawn there as its own icon, one sprite for every 5 purchases of that upgrade (capped at 20 sprites per upgrade), at a fixed spot per sprite. Sprites vanish on prestige along with the purchases.
+The second top-screen page is a tiled island (autotiled from `assets/island/island_tiles.png`: sea, sand, grass, palms, rocks, shells) filling the whole screen under the header. Every 5 purchases of an upgrade add one wandering critter wearing that upgrade's icon (up to 48 at once, shared fairly between upgrades). Critters stay on land, walk around palms, rocks and the bench, drift toward the parasol and palms, bump into each other, and greet each other (hearts for the same upgrade, a note for different ones); sometimes one follows the other around. They disappear on prestige along with the purchases.
 
 ## Tested Devices/Emulators
 | Device/Emu | Tested | Tester |
@@ -47,8 +47,9 @@ To change the track or quality: `python3 tools/convert_music.py --rate 22050` (n
 
 ## Credits
 - **Game:** VoltacceptYT
-- **Sprites:** Mojang / VoltacceptYT
-- **Music:** VO!DWiNG
+- **Sprites:** Mojang / VoltacceptYT / ic22487 (Modrinth)
+- **Tiles:** Wabby Wabbo (Itch.io)
+- **Music:** VO!DWiNG (Discord)
 
 ### Other Thanks
 - **devkitPro** - The Compiling Tools

@@ -13,6 +13,7 @@
 #include "audio.h"
 #include "game.h"
 #include "gfx.h"
+#include "isles.h"
 #include "sprites.h"
 #include "ui.h"
 
@@ -24,6 +25,7 @@ static px fbTop[SCREEN_W * SCREEN_H] __attribute__((aligned(32)));
 static px fbBot[SCREEN_W * SCREEN_H] __attribute__((aligned(32)));
 static px bgTopBuf[SCREEN_W * SCREEN_H] __attribute__((aligned(32)));
 static px bgBotBuf[SCREEN_W * SCREEN_H] __attribute__((aligned(32)));
+static px bgIsleBuf[SCREEN_W * SCREEN_H] __attribute__((aligned(32)));
 static u16 *vramTop, *vramBot;
 
 static u16 *jerryGfx[JERRY_COUNT];
@@ -137,6 +139,7 @@ static void setup(void) {
     if (candyGfx) upload(candy_gfx, candyGfx, 256);
 
     ui_draw_backgrounds(bgTopBuf, bgBotBuf);
+    isles_init(bgIsleBuf, (uint32_t)time(NULL));
     keysSetRepeat(15, 4);
 }
 
@@ -284,6 +287,7 @@ int main(void) {
 
     fatOk = fatInitDefault();
     load_game();
+    isles_sync(&game);
     schedule_golden();
     audio_init(); // looping background music (plays on the ARM7 sound hardware)
 
@@ -334,6 +338,7 @@ int main(void) {
             bool no = (down & KEY_B) || (touched && t.py >= UI_BTN_Y && t.px >= 128);
             if (yes) {
                 game_do_prestige(&game);
+                isles_sync(&game);
                 confirmPrestige = false;
                 set_msg("Prestiged!", "Your progress was reset.", 150);
                 save_game();
@@ -352,7 +357,7 @@ int main(void) {
                 if (rep & KEY_DOWN) { sel++; dirtyTop = true; }
                 clamp_scroll();
                 if (down & KEY_A) {
-                    game_buy(&game, sel);
+                    if (game_buy(&game, sel)) isles_sync(&game);
                     dirtyTop = dirtyBot = true;
                 }
             }
@@ -391,6 +396,7 @@ int main(void) {
 
         // Simulation
         game_tick(&game);
+        if (page == PAGE_ISLES) isles_tick();
 
         if (pressFrames > 0) pressFrames--;
         if (msgTimer > 0 && --msgTimer == 0) dirtyBot = true;
@@ -421,7 +427,7 @@ int main(void) {
         frame++;
         UiView view;
         make_view(&view);
-        if ((dirtyTop || frame % 10 == 0) && !readyTop) {
+        if ((dirtyTop || frame % (page == PAGE_ISLES ? 2 : 10) == 0) && !readyTop) {
             ui_draw_top(fbTop, bgTopBuf, &view);
             readyTop = true;
             dirtyTop = false;
