@@ -1,6 +1,6 @@
 # Jerry Clicker (Nintendo DS)
 
-Port of [JerryClicker](https://github.com/) to the Nintendo DS using devkitARM + libnds.
+Port of [JerryClicker](https://github.com/VoltacceptYT/JerryClicker/) to the Nintendo DS using devkitARM + libnds.
 The original sprites are used for Jerry, the power-up, the floating candy and every upgrade icon.
 The UI uses the original Jerrified Pixels font and the original UI sprites (stone background, buttons, locked overlay), software-rendered on both screens.
 
