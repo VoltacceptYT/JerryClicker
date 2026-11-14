@@ -30,8 +30,9 @@ See the [`nds-port` README](https://github.com/VoltacceptYT/JerryClicker/tree/nd
 ## Credits
 
 - **Game:** VoltacceptYT
-- **Sprites:** Mojang / VoltacceptYT
-- **Music:** VO!DWiNG
+- **Sprites:** Mojang / VoltacceptYT / ic22487 (Modrinth)
+- **Tiles:** Wabby Wabbo (Itch.io)
+- **Music:** VO!DWiNG (Discord)
 
 ### Other Thanks
 
