@@ -35,4 +35,5 @@ To change the track or quality: `python3 tools/convert_music.py --rate 22050` (n
 - **Music:** VO!DWiNG
 
 ### Other Thanks
-- **devkitPro** - Compiler
+- **devkitPro** - The Compiling Tools
+- **Hypixel** - Creating Jerry Himself
