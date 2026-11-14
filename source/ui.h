@@ -8,6 +8,11 @@
 
 #define UI_VISIBLE 6
 
+// Top-screen pages (L/R cycles through them)
+#define PAGE_UPGRADES 0
+#define PAGE_ISLES 1
+#define PAGE_COUNT 2
+
 // Bottom-screen layout (shared with touch handling in main.c)
 #define UI_JERRY_X 96
 #define UI_JERRY_Y 69
@@ -19,6 +24,7 @@
 
 typedef struct {
     const Game *game;
+    int page;      // PAGE_UPGRADES or PAGE_ISLES
     int sel, scroll;
     bool confirmPrestige;
     const char *msg0, *msg1; // shown while msgTimer > 0 or confirming

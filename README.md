@@ -10,14 +10,18 @@ The UI uses the original Jerrified Pixels font and the original UI sprites (ston
 | Input | Action |
 |---|---|
 | Touch Jerry / **B** | Click |
-| **Up/Down**, **L/R** | Select upgrade / page |
-| **A** | Buy selected upgrade |
+| **Up/Down** | Select upgrade (Upgrades page) |
+| **L/R** | Switch page (Upgrades / Jerry Isles) |
+| **A** | Buy selected upgrade (Upgrades page) |
 | **Select** | Music on/off |
 | **Start** or touch `[PRESTIGE]` | Prestige (confirm with A/B or touch YES/NO) |
 | Touch `[SAVE]` | Save now (also autosaves every 30 s) |
 | Touch Golden Jerry | Random bonus |
 
 Saves go to `JerryClicker.sav` next to the ROM on a flashcart/SD (needs DLDI/FAT). Without storage the game still runs, it just can't save.
+
+## Jerry Isles
+The second top-screen page is a scene that fills the whole screen under the header. Every upgrade you own is drawn there as its own icon, one sprite for every 5 purchases of that upgrade (capped at 20 sprites per upgrade), at a fixed spot per sprite. Sprites vanish on prestige along with the purchases.
 
 ## Tested Devices/Emulators
 | Device/Emu | Tested | Tester |

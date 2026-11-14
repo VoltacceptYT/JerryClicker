@@ -1,6 +1,6 @@
 // Jerry Clicker for Nintendo DS
-//  Bottom screen (touch): stats, Jerry, buttons.   Top screen: upgrade list.
-//  Controls: Touch Jerry or B = click | Up/Down = select | L/R = page | A = buy
+//  Bottom screen (touch): stats, Jerry, buttons.   Top screen: pages (Upgrades / Jerry Isles).
+//  Controls: Touch Jerry or B = click | Up/Down = select | L/R = switch page | A = buy
 //            Start = prestige | Select = music on/off | Touch SAVE / PRESTIGE buttons
 //  Both screens are software-rendered (see gfx.c / ui.c) using the original font and sprites.
 #include <fat.h>
@@ -32,6 +32,7 @@ static u16 *goldenGfx, *candyGfx;
 static Game game;
 static bool fatOk = false;
 static int sel = 0, scroll = 0;
+static int page = PAGE_UPGRADES;
 static u32 frame = 0;
 
 // Messages (bottom screen)
@@ -143,6 +144,7 @@ static void setup(void) {
 
 static void make_view(UiView *v) {
     v->game = &game;
+    v->page = page;
     v->sel = sel;
     v->scroll = scroll;
     v->confirmPrestige = confirmPrestige;
@@ -342,14 +344,17 @@ int main(void) {
                 dirtyBot = true;
             }
         } else {
-            if (rep & KEY_UP) { sel--; dirtyTop = true; }
-            if (rep & KEY_DOWN) { sel++; dirtyTop = true; }
-            if (down & KEY_L) { sel -= UI_VISIBLE; dirtyTop = true; }
-            if (down & KEY_R) { sel += UI_VISIBLE; dirtyTop = true; }
-            clamp_scroll();
-            if (down & KEY_A) {
-                game_buy(&game, sel);
-                dirtyTop = dirtyBot = true;
+            // L/R switch pages (wraps around)
+            if (down & KEY_L) { page = (page + PAGE_COUNT - 1) % PAGE_COUNT; dirtyTop = true; }
+            if (down & KEY_R) { page = (page + 1) % PAGE_COUNT; dirtyTop = true; }
+            if (page == PAGE_UPGRADES) {
+                if (rep & KEY_UP) { sel--; dirtyTop = true; }
+                if (rep & KEY_DOWN) { sel++; dirtyTop = true; }
+                clamp_scroll();
+                if (down & KEY_A) {
+                    game_buy(&game, sel);
+                    dirtyTop = dirtyBot = true;
+                }
             }
             if (down & KEY_B) {
                 do_click(UI_JERRY_X + 32, UI_JERRY_Y + 16);
