@@ -8,7 +8,7 @@
 
 // Each purchase multiplies an upgrade's price by this much.
 #define COST_GROWTH 1.15
-#define UPGRADE_COUNT 22
+#define UPGRADE_COUNT 27
 #define FRENZY_FRAMES (30 * 60)
 
 typedef enum {

@@ -12,10 +12,11 @@ A = os.path.join(ROOT, "assets")
 # Must match the order of UPGRADES[] in source/game.c
 UPGRADE_IDS = [
     "inflatable_jerry", "jerry_box_green", "jerry_box_blue", "jerry_box_purple",
-    "jerry_box_golden", "jerry_box_mega", "jerry_staff", "jerry_rune", "jerry_rune_2",
+    "jerry_box_golden", "unfulfilled_jerryseed", "jerry_box_mega", "unripe_jerryseed",
+    "jerry_staff", "jerry_rune", "fertilized_jerryseed", "jerry_rune_2", "jerryflower",
     "jerry_rune_3", "jerry_talisman_green", "jerry_talisman_blue", "jerry_talisman_purple",
     "jerry_talisman_golden", "jerry_stone", "aspect_of_the_jerry",
-    "aspect_of_the_jerry_signature", "pet_item_toy_jerry", "pet_item_lord_jerry",
+    "aspect_of_the_jerry_signature", "dye_jerry", "pet_item_toy_jerry", "pet_item_lord_jerry",
     "pet_item_scuba_jerry", "pet_item_angel_jerry", "pet_item_iron_jerry",
 ]
 JERRIES = ["jerry", "lord_jerry", "scuba_jerry", "iron_jerry", "angel_jerry"]

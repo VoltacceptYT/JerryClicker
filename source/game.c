@@ -10,10 +10,14 @@ const UpgradeDef UPGRADES[UPGRADE_COUNT] = {
     {"jerry_box_blue", "Jerry Box (Blue)", "+3 candies/sec auto-gen", 5000, UP_AUTO, 3},
     {"jerry_box_purple", "Jerry Box (Purple)", "+15 candies/sec auto-gen", 40000, UP_AUTO, 15},
     {"jerry_box_golden", "Jerry Box (Golden)", "+80 candies/sec auto-gen", 500000, UP_AUTO, 80},
+    {"unfulfilled_jerryseed", "Unfulfilled Jerryseed", "+100 candies/sec auto-gen", 1500000, UP_AUTO, 100},
     {"jerry_box_mega", "Jerry Box (Mega)", "+500 candies/sec auto-gen", 8000000, UP_AUTO, 500},
+    {"unripe_jerryseed", "Unripe Jerryseed", "+1k candies/sec auto-gen", 20000000, UP_AUTO, 1000},
     {"jerry_staff", "Jerry Staff", "Quadruples auto-gen rate", 40000000, UP_AUTOMULT, 4},
     {"jerry_rune", "Jerry Rune I", "+2.5k candies/sec auto-gen", 80000000, UP_AUTO, 2500},
+    {"fertilized_jerryseed", "Fertilized Jerryseed", "+6k candies/sec auto-gen", 300000000.0, UP_AUTO, 6000},
     {"jerry_rune_2", "Jerry Rune II", "+15k candies/sec auto-gen", 1500000000.0, UP_AUTO, 15000},
+    {"jerryflower", "Jerryflower", "+40k candies/sec auto-gen", 5000000000.0, UP_AUTO, 40000},
     {"jerry_rune_3", "Jerry Rune III", "+90k candies/sec auto-gen", 25000000000.0, UP_AUTO, 90000},
     {"jerry_talisman_green", "Jerry Talisman (Green)", "+550k candies/sec auto-gen", 400000000000.0, UP_AUTO, 550000},
     {"jerry_talisman_blue", "Jerry Talisman (Blue)", "+3.5M candies/sec auto-gen", 6000000000000.0, UP_AUTO, 3500000},
@@ -22,6 +26,7 @@ const UpgradeDef UPGRADES[UPGRADE_COUNT] = {
     {"jerry_stone", "Jerry Stone", "+50 candies per click", 200000, UP_CLICK, 50},
     {"aspect_of_the_jerry", "Aspect of the Jerry", "Unlock prestige system", 750000, UP_PRESTIGE, 1},
     {"aspect_of_the_jerry_signature", "Aspect of the Jerry (Sig.)", "Prestige multiplier x2", 2000000, UP_PRESTIGEMULT, 2},
+    {"dye_jerry", "Jerry Dye", "+2.5k candies per click", 10000000, UP_CLICK, 2500},
     {"pet_item_toy_jerry", "Pet Item: Jerry 3D Glasses", "Adds trippy 3D anaglyph effect to Jerry", 25000000, UP_COSMETIC, 1},
     {"pet_item_lord_jerry", "Pet Item: Lord's Crown", "Converts Jerry into Lord Jerry", 25000000, UP_COSMETIC, 1},
     {"pet_item_scuba_jerry", "Pet Item: Scuba Mask", "Converts Jerry into Scuba Jerry", 25000000, UP_COSMETIC, 1},
@@ -200,21 +205,83 @@ void game_pack(const Game *g, uint8_t *out) {
     memcpy(out, &b, sizeof(b));
 }
 
+/* Saves from before the Jerryseed/Jerryflower/Dye update held 22 upgrades in this order. */
+#define LEGACY_COUNT 22
+static const char *const LEGACY_IDS[LEGACY_COUNT] = {
+    "inflatable_jerry", "jerry_box_green", "jerry_box_blue", "jerry_box_purple",
+    "jerry_box_golden", "jerry_box_mega", "jerry_staff", "jerry_rune", "jerry_rune_2",
+    "jerry_rune_3", "jerry_talisman_green", "jerry_talisman_blue", "jerry_talisman_purple",
+    "jerry_talisman_golden", "jerry_stone", "aspect_of_the_jerry",
+    "aspect_of_the_jerry_signature", "pet_item_toy_jerry", "pet_item_lord_jerry",
+    "pet_item_scuba_jerry", "pet_item_angel_jerry", "pet_item_iron_jerry",
+};
+
+typedef struct {
+    double candies;
+    double perClick;
+    double autoRate;
+    UpgradeState up[LEGACY_COUNT];
+    int32_t prestigeLevel;
+    double prestigeMult;
+} LegacyState;
+
+typedef struct {
+    uint32_t magic;
+    uint32_t size;
+    LegacyState state;
+    uint32_t checksum;
+} LegacyBlob;
+
+static uint32_t checksum_legacy(const LegacyState *s) {
+    const uint8_t *p = (const uint8_t *)s;
+    uint32_t h = 2166136261u;
+    for (size_t i = 0; i < sizeof(*s); i++) {
+        h ^= p[i];
+        h *= 16777619u;
+    }
+    return h;
+}
+
 static bool sane(double v) { return isfinite(v) && v >= 0; }
 
 bool game_unpack(Game *g, const uint8_t *in, size_t len) {
-    if (len < sizeof(SaveBlob)) return false;
-    SaveBlob b;
-    memcpy(&b, in, sizeof(b));
-    if (b.magic != SAVE_MAGIC || b.size != sizeof(SaveBlob)) return false;
-    if (b.checksum != checksum(&b.state)) return false;
+    GameState cur;
+    bool haveCur = false;
+    memset(&cur, 0, sizeof(cur));
 
-    GameState *s = &b.state;
+    if (len >= sizeof(SaveBlob)) {
+        SaveBlob b;
+        memcpy(&b, in, sizeof(b));
+        if (b.magic == SAVE_MAGIC && b.size == sizeof(SaveBlob)) {
+            if (b.checksum != checksum(&b.state)) return false;
+            cur = b.state;
+            haveCur = true;
+        } else if (b.magic != SAVE_MAGIC || b.size != sizeof(LegacyBlob)) {
+            return false;
+        }
+    }
+    if (!haveCur) {
+        if (len < sizeof(LegacyBlob)) return false;
+        LegacyBlob lb;
+        memcpy(&lb, in, sizeof(lb));
+        if (lb.magic != SAVE_MAGIC || lb.size != sizeof(LegacyBlob)) return false;
+        if (lb.checksum != checksum_legacy(&lb.state)) return false;
+        cur.candies = lb.state.candies;
+        cur.perClick = lb.state.perClick;
+        cur.autoRate = lb.state.autoRate;
+        cur.prestigeLevel = lb.state.prestigeLevel;
+        cur.prestigeMult = lb.state.prestigeMult;
+        for (int i = 0; i < LEGACY_COUNT; i++) {
+            int idx = idx_of(LEGACY_IDS[i]);
+            cur.up[idx].count = lb.state.up[i].count;
+        }
+    }
+
+    GameState *s = &cur;
     if (!sane(s->candies) || !sane(s->perClick) || !sane(s->autoRate) || !sane(s->prestigeMult)) return false;
     if (s->prestigeLevel < 0) return false;
     for (int i = 0; i < UPGRADE_COUNT; i++) {
         if (s->up[i].count < 0 || s->up[i].count > 100000) return false;
-        // Re-derive price from the base cost so old pricing never sticks.
         s->up[i].cost = UPGRADES[i].cost * pow(COST_GROWTH, s->up[i].count);
     }
     game_init(g);

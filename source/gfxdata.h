@@ -2,7 +2,7 @@
 #ifndef GFXDATA_H
 #define GFXDATA_H
 #include <stdint.h>
-#define ICON_COUNT 22
+#define ICON_COUNT 27
 typedef struct { const uint16_t *rows; const uint8_t *adv; int height; } Font;
 extern const Font font10;
 extern const Font font14;
