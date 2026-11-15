@@ -1,6 +1,7 @@
 // Jerry Clicker for Nintendo DS
 //  Bottom screen (touch): stats, Jerry, buttons.   Top screen: pages (Upgrades / Jerry Isles).
 //  Controls: Touch Jerry or B = click | Up/Down = select | L/R = switch page | A = buy
+//            Isles page: touch a toy card (or D-pad + A) to buy it instead of tapping Jerry
 //            Start = prestige | Select = music on/off | Touch SAVE / PRESTIGE buttons
 //  Both screens are software-rendered (see gfx.c / ui.c) using the original font and sprites.
 #include <fat.h>
@@ -36,6 +37,7 @@ static Game game;
 static bool fatOk = false;
 static int sel = 0, scroll = 0;
 static int page = PAGE_UPGRADES;
+static int toySel = TOY_BALL;
 static u32 frame = 0;
 
 // Messages (bottom screen)
@@ -74,7 +76,7 @@ static bool save_game(void) {
         snprintf(saveStatus, sizeof saveStatus, "No SD: saving off");
         return false;
     }
-    uint8_t buf[512];
+    uint8_t buf[1024];
     size_t n = game_save_size();
     if (n > sizeof buf) return false;
     game_pack(&game, buf);
@@ -99,7 +101,7 @@ static void load_game(void) {
         snprintf(saveStatus, sizeof saveStatus, "New game");
         return;
     }
-    uint8_t buf[512];
+    uint8_t buf[1024];
     size_t n = fread(buf, 1, sizeof buf, f);
     fclose(f);
     Game loaded;
@@ -151,6 +153,7 @@ static void make_view(UiView *v) {
     v->game = &game;
     v->page = page;
     v->sel = sel;
+    v->toySel = toySel;
     v->scroll = scroll;
     v->confirmPrestige = confirmPrestige;
     v->msg0 = msg[0];
@@ -183,8 +186,12 @@ static void update_sprites(void) {
     int wobble;
     int v = jerry_variant(&wobble);
     int dy = pressFrames > 0 ? 3 : 0;
-    oamSet(&oamSub, 5, UI_JERRY_X + wobble, UI_JERRY_Y + dy, 0, 0, SpriteSize_64x64,
-           SpriteColorFormat_256Color, jerryGfx[v], -1, false, false, false, false, false);
+    if (page == PAGE_ISLES) {
+        hide_sub(5, SpriteSize_64x64, jerryGfx[0]);  // the toy shop takes Jerry's place
+    } else {
+        oamSet(&oamSub, 5, UI_JERRY_X + wobble, UI_JERRY_Y + dy, 0, 0, SpriteSize_64x64,
+               SpriteColorFormat_256Color, jerryGfx[v], -1, false, false, false, false, false);
+    }
 
     for (int i = 0; i < FLOATERS; i++) {
         if (floaters[i].on) {
@@ -254,6 +261,31 @@ static void claim_golden(void) {
     set_msg(a, b, 150);
     goldenOn = false;
     schedule_golden();
+}
+
+static void buy_toy(int t) {
+    char a[48], b[64], c[48];
+    toySel = t;
+    if (game_toy_maxed(&game, t)) {
+        snprintf(a, sizeof a, "%s", TOYS[t].name);
+        set_msg(a, "You own the max!", 90);
+    } else if (!game_can_buy_toy(&game, t)) {
+        format_number(game_toy_cost(&game, t), c, sizeof c);
+        snprintf(b, sizeof b, "%s candies", c);
+        set_msg("Not enough candies:", b, 90);
+    } else {
+        game_buy_toy(&game, t);
+        isles_sync(&game);
+        snprintf(a, sizeof a, "Bought %s!", TOYS[t].name);
+        set_msg(a, t == TOY_BALL ? "Your critters will play" : "Your critters will build", 120);
+    }
+}
+
+static int toy_at(int x, int y) {
+    if (y < UI_TOY_Y || y >= UI_TOY_Y + UI_TOY_H) return -1;
+    if (x >= UI_TOY_X0 && x < UI_TOY_X0 + UI_TOY_W) return TOY_BALL;
+    if (x >= UI_TOY_X1 && x < UI_TOY_X1 + UI_TOY_W) return TOY_SHOVEL;
+    return -1;
 }
 
 static void request_prestige(void) {
@@ -352,8 +384,8 @@ int main(void) {
             }
         } else {
             // L/R switch pages (wraps around)
-            if (down & KEY_L) { page = (page + PAGE_COUNT - 1) % PAGE_COUNT; dirtyTop = true; }
-            if (down & KEY_R) { page = (page + 1) % PAGE_COUNT; dirtyTop = true; }
+            if (down & KEY_L) { page = (page + PAGE_COUNT - 1) % PAGE_COUNT; dirtyTop = dirtyBot = true; }
+            if (down & KEY_R) { page = (page + 1) % PAGE_COUNT; dirtyTop = dirtyBot = true; }
             if (page == PAGE_UPGRADES) {
                 if (rep & KEY_UP) { sel--; dirtyTop = true; }
                 if (rep & KEY_DOWN) { sel++; dirtyTop = true; }
@@ -363,7 +395,11 @@ int main(void) {
                     dirtyTop = dirtyBot = true;
                 }
             }
-            if (down & KEY_B) {
+            if (page == PAGE_ISLES) {
+                if (down & (KEY_LEFT | KEY_UP)) { toySel = TOY_BALL; dirtyBot = true; }
+                if (down & (KEY_RIGHT | KEY_DOWN)) { toySel = TOY_SHOVEL; dirtyBot = true; }
+                if (down & KEY_A) { buy_toy(toySel); dirtyBot = true; }
+            } else if (down & KEY_B) {
                 do_click(UI_JERRY_X + 32, UI_JERRY_Y + 16);
                 dirtyBot = true;
             }
@@ -388,6 +424,9 @@ int main(void) {
                 } else if (t.py >= UI_BTN_Y && t.py < UI_BTN_Y + UI_BTN_H) {
                     if (t.px < 128) save_game();
                     else request_prestige();
+                } else if (page == PAGE_ISLES) {
+                    int ti = toy_at(t.px, t.py);
+                    if (ti >= 0) buy_toy(ti);
                 } else if (t.px >= UI_JERRY_X - 12 && t.px < UI_JERRY_X + 76 &&
                            t.py >= UI_JERRY_Y - 8 && t.py < UI_JERRY_Y + 72) {
                     do_click(t.px, t.py);

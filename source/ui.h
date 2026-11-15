@@ -22,6 +22,13 @@
 #define UI_BTN_R_X 136
 #define UI_BTN_W 116
 
+// Jerry Isles bottom screen: the toy shop replaces Jerry (two cards side by side)
+#define UI_TOY_Y 71
+#define UI_TOY_H 62
+#define UI_TOY_W 118
+#define UI_TOY_X0 8
+#define UI_TOY_X1 130
+
 typedef struct {
     const Game *game;
     int page;      // PAGE_UPGRADES or PAGE_ISLES
@@ -31,6 +38,7 @@ typedef struct {
     int msgTimer;
     const char *saveStatus;
     bool fatOk;
+    int toySel;    // toy card highlighted on the Isles page
     int pressedBtn; // 0 = none, 1 = left button held, 2 = right button held
 } UiView;
 

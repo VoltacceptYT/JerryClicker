@@ -216,7 +216,7 @@ static void build_terrain(void) {
 
 /* ---------------- Critters ---------------- */
 
-enum { ST_IDLE, ST_WALK, ST_FOLLOW, ST_GREET };
+enum { ST_IDLE, ST_WALK, ST_FOLLOW, ST_GREET, ST_PLAY, ST_BUILD };
 enum { EM_NONE, EM_HEART, EM_NOTE, EM_BANG };
 
 typedef struct {
@@ -226,6 +226,8 @@ typedef struct {
     int16_t vx, vy;      // 8.8 px per frame
     int16_t timer, cool;
     int8_t partner;
+    int8_t toy;          // ST_PLAY: ball index, ST_BUILD: castle index
+    uint8_t phase;       // ST_BUILD: 0 = walking to the site, 1 = digging
 } Critter;
 
 static Critter crit[ISL_MAX_CRITTERS];
@@ -293,6 +295,7 @@ static void spawn(int slot, int up, int idx) {
     c->on = 1; c->up = (uint8_t)up; c->idx = (uint8_t)idx;
     c->spd = (uint8_t)(70 + rr(50));
     c->partner = -1;
+    c->toy = -1;
     for (int tries = 0; tries < 60; tries++) {
         int cx = rr(COLS), cy = rr(ROWS);
         if (!walk[cy][cx]) continue;
@@ -303,6 +306,9 @@ static void spawn(int slot, int up, int idx) {
     c->hop = 8;  // pop in
     set_idle(c, rr(60));
 }
+
+static void release_toys(int slot);
+static void sync_toys(const Game *g);
 
 static void drop_partner_refs(int slot) {
     for (int i = 0; i < ISL_MAX_CRITTERS; i++)
@@ -334,13 +340,14 @@ void isles_sync(const Game *g) {
         for (k = 0; k < nw; k++)
             if (!have[k] && wantUp[k] == crit[s].up && wantIdx[k] == crit[s].idx) break;
         if (k < nw) have[k] = true;
-        else { crit[s].on = 0; drop_partner_refs(s); }
+        else { crit[s].on = 0; drop_partner_refs(s); release_toys(s); }
     }
     for (int k = 0; k < nw; k++) {
         if (have[k]) continue;
         for (int s = 0; s < ISL_MAX_CRITTERS; s++)
             if (!crit[s].on) { spawn(s, wantUp[k], wantIdx[k]); break; }
     }
+    sync_toys(g);
 }
 
 int isles_critter_count(void) {
@@ -379,6 +386,186 @@ static void step_to(Critter *c, int32_t nx, int32_t ny) {  // slide along walls 
     else if (walk_at(c->x, ny)) c->y = ny;
 }
 
+/* ---------------- Toys ----------------
+ * Beach balls (Game.toys[TOY_BALL]): real little bounces. Critters kick the ball away from themselves,
+ * it arcs through the air, hops off the ground losing a bit of height each time and ricochets off water,
+ * palms and rocks. Idle critters sometimes chase one.
+ * Plastic shovels (Game.toys[TOY_SHOVEL]): up to as many critters as there are shovels walk to a sand
+ * patch, dig until a sandcastle stands there, and the castle later crumbles away to make room for more. */
+
+#define BALL_GRAV 40          // 8.8 px/frame^2
+#define BALL_MIN_BOUNCE 90    // below this vertical speed the ball just rolls
+#define BUILD_FRAMES 270
+#define CASTLE_LIFE (50 * 60)
+#define CRUMBLE_STEP 30
+
+typedef struct {
+    uint8_t on, cool;
+    int32_t x, y, z;        // ground position and height, 24.8 fixed point (pixels)
+    int16_t vx, vy, vz;     // 8.8 px per frame
+} Ball;
+
+typedef struct {
+    uint8_t on, stage;      // stage 0 = site reserved, nothing dug yet; 1..3 = mound, tower, castle
+    int8_t builder;         // critter slot digging it, -1 once finished
+    int16_t x, y;           // feet (pixels)
+    int32_t age;            // build progress while building, then frames since it was finished
+} Castle;
+
+static Ball balls[ISL_MAX_BALLS];
+static Castle castles[ISL_MAX_CASTLES];
+static int ballsWanted, shovelsWanted;
+
+int isles_castle_count(void) {
+    int n = 0;
+    for (int i = 0; i < ISL_MAX_CASTLES; i++) n += castles[i].on && castles[i].stage > 0;
+    return n;
+}
+
+static bool ball_walk(int32_t fx, int32_t fy) {
+    int x = (int)(fx >> 8), y = (int)(fy >> 8);
+    return walk_cell(x, y) && walk_cell(x - 3, y) && walk_cell(x + 3, y);
+}
+
+static void spawn_ball(Ball *b) {
+    memset(b, 0, sizeof *b);
+    b->on = 1;
+    for (int tries = 0; tries < 60; tries++) {
+        int cx = rr(COLS), cy = rr(ROWS);
+        if (!walk[cy][cx]) continue;
+        b->x = ((int32_t)(cx * 16 + 8 + rr(5) - 2)) << 8;
+        b->y = ((int32_t)(SCENE_Y + cy * 16 + 8 + rr(5) - 2)) << 8;
+        if (ball_walk(b->x, b->y)) break;
+    }
+    b->z = (int32_t)70 << 8;  // drops in from above and bounces
+}
+
+static void update_ball(Ball *b) {
+    if (b->cool) b->cool--;
+    b->vz -= BALL_GRAV;
+    b->z += b->vz;
+    if (b->z <= 0) {
+        b->z = 0;
+        if (b->vz < -BALL_MIN_BOUNCE) {
+            b->vz = (int16_t)(-b->vz * 3 / 4);
+            b->vx = (int16_t)(b->vx * 7 / 8);
+            b->vy = (int16_t)(b->vy * 7 / 8);
+        } else {
+            b->vz = 0;
+            b->vx = (int16_t)(b->vx * 15 / 16);
+            b->vy = (int16_t)(b->vy * 15 / 16);
+        }
+    }
+    int32_t nx = b->x + b->vx, ny = b->y + b->vy;
+    if (ball_walk(nx, ny)) {
+        b->x = nx; b->y = ny;
+    } else if (ball_walk(nx, b->y)) {
+        b->x = nx; b->vy = (int16_t)(-b->vy * 3 / 4);
+    } else if (ball_walk(b->x, ny)) {
+        b->y = ny; b->vx = (int16_t)(-b->vx * 3 / 4);
+    } else {
+        b->vx = (int16_t)(-b->vx * 3 / 4);
+        b->vy = (int16_t)(-b->vy * 3 / 4);
+    }
+}
+
+static void kick_ball(Ball *b) {
+    if (b->cool || b->z > ((int32_t)10 << 8)) return;
+    int bx = (int)(b->x >> 8), by = (int)(b->y >> 8);
+    for (int i = 0; i < ISL_MAX_CRITTERS; i++) {
+        Critter *c = &crit[i];
+        if (!c->on || c->state == ST_GREET || c->state == ST_BUILD) continue;
+        int dx = bx - (int)(c->x >> 8), dy = by - (int)(c->y >> 8);
+        if (dx > 12 || dx < -12 || dy > 12 || dy < -12) continue;
+        int d = dist_approx(dx, dy);
+        if (d > 11) continue;
+        if (d == 0) { dx = rr(3) - 1; dy = 1; d = iabs(dx) + 1; }
+        int sp = 200 + rr(220);
+        b->vx = (int16_t)(dx * sp / d + rr(61) - 30);
+        b->vy = (int16_t)(dy * sp / d + rr(61) - 30);
+        b->vz = (int16_t)(380 + rr(200));
+        b->cool = 18;
+        c->hop = 8;
+        return;
+    }
+}
+
+static int builder_count(void) {
+    int n = 0;
+    for (int i = 0; i < ISL_MAX_CASTLES; i++) n += castles[i].on && castles[i].builder >= 0;
+    return n;
+}
+
+static bool start_build(Critter *c, int slot) {
+    int ci = -1;
+    for (int k = 0; k < ISL_MAX_CASTLES && k < shovelsWanted * 2; k++)
+        if (!castles[k].on) { ci = k; break; }
+    if (ci < 0) return false;
+    for (int tries = 0; tries < 24; tries++) {
+        int cx = rr(COLS), cy = rr(ROWS);
+        if (cell(cx, cy) != 's' || !walk[cy][cx]) continue;
+        int x = cx * 16 + 8 + rr(5) - 2, y = SCENE_Y + cy * 16 + 10 + rr(3);
+        if (!walk_at((int32_t)x << 8, (int32_t)y << 8)) continue;
+        bool clear = true;
+        for (int k = 0; k < ISL_MAX_CASTLES; k++)
+            if (castles[k].on && dist_approx(x - castles[k].x, y - castles[k].y) < 24) clear = false;
+        if (!clear) continue;
+        Castle *k = &castles[ci];
+        k->on = 1; k->stage = 0; k->builder = (int8_t)slot; k->x = (int16_t)x; k->y = (int16_t)y; k->age = 0;
+        c->state = ST_BUILD; c->phase = 0; c->toy = (int8_t)ci; c->vx = c->vy = 0; c->timer = 900;
+        return true;
+    }
+    return false;
+}
+
+static bool start_play(Critter *c) {
+    int best = -1, bestD = 0;
+    int px0 = (int)(c->x >> 8), py0 = (int)(c->y >> 8);
+    for (int i = 0; i < ballsWanted && i < ISL_MAX_BALLS; i++) {
+        if (!balls[i].on) continue;
+        int d = dist_approx((int)(balls[i].x >> 8) - px0, (int)(balls[i].y >> 8) - py0);
+        if (best < 0 || d < bestD) { best = i; bestD = d; }
+    }
+    if (best < 0) return false;
+    c->state = ST_PLAY; c->toy = (int8_t)best; c->timer = (int16_t)(240 + rr(240)); c->vx = 0; c->vy = 0;
+    return true;
+}
+
+// An idle critter that has finished resting may pick up a toy instead of just wandering.
+static bool try_toy(Critter *c, int slot) {
+    if (shovelsWanted > 0 && builder_count() < shovelsWanted && rr(3) == 0 && start_build(c, slot)) return true;
+    if (ballsWanted > 0 && rr(2) == 0 && start_play(c)) return true;
+    return false;
+}
+
+static void release_toys(int slot) {
+    for (int k = 0; k < ISL_MAX_CASTLES; k++)
+        if (castles[k].on && castles[k].builder == slot) {
+            if (castles[k].stage < 3) castles[k].on = 0;
+            castles[k].builder = -1;
+            castles[k].age = 0;
+        }
+}
+
+static void update_castle(Castle *k) {
+    if (!k->on || k->builder >= 0) return;
+    k->age++;
+    if (k->age > CASTLE_LIFE) {  // washes away: tower by tower
+        int t = (k->age - CASTLE_LIFE) / CRUMBLE_STEP;
+        if (t >= 3) k->on = 0;
+        else k->stage = (uint8_t)(3 - t);
+    }
+}
+
+static void sync_toys(const Game *g) {
+    ballsWanted = g->s.toys[TOY_BALL] > ISL_MAX_BALLS ? ISL_MAX_BALLS : g->s.toys[TOY_BALL];
+    shovelsWanted = g->s.toys[TOY_SHOVEL] > TOY_MAX ? TOY_MAX : g->s.toys[TOY_SHOVEL];
+    for (int i = 0; i < ISL_MAX_BALLS; i++) {
+        if (i < ballsWanted && !balls[i].on) spawn_ball(&balls[i]);
+        else if (i >= ballsWanted) balls[i].on = 0;
+    }
+}
+
 static void update_critter(int i) {
     Critter *c = &crit[i];
     if (c->cool > 0) c->cool--;
@@ -387,7 +574,7 @@ static void update_critter(int i) {
 
     switch (c->state) {
     case ST_IDLE:
-        if (--c->timer <= 0) pick_target(c);
+        if (--c->timer <= 0 && !try_toy(c, i)) pick_target(c);
         break;
     case ST_WALK: {
         int32_t nx = c->x + c->vx, ny = c->y + c->vy;
@@ -410,6 +597,47 @@ static void update_critter(int i) {
             c->vx = 1;
         } else {
             c->vx = 0;
+        }
+        break;
+    }
+    case ST_PLAY: {
+        Ball *b = (c->toy >= 0) ? &balls[(int)c->toy] : NULL;
+        if (!b || !b->on || --c->timer <= 0) { set_idle(c, 20 + rr(40)); c->toy = -1; break; }
+        int dx = (int)((b->x - c->x) >> 8), dy = (int)((b->y - c->y) >> 8);
+        int len = dist_approx(dx, dy);
+        if (len > 8) {
+            int sp = c->spd + 40;
+            step_to(c, c->x + dx * sp / len, c->y + dy * sp / len);
+            c->vx = 1;
+        } else {
+            c->vx = 0;
+        }
+        break;
+    }
+    case ST_BUILD: {
+        Castle *k = (c->toy >= 0) ? &castles[(int)c->toy] : NULL;
+        if (!k || !k->on || k->builder != i) { set_idle(c, 20); c->toy = -1; break; }
+        if (c->phase == 0) {
+            int dx = k->x - (int)(c->x >> 8), dy = k->y - (int)(c->y >> 8);
+            int len = dist_approx(dx, dy);
+            if (len <= 3) {
+                c->phase = 1; c->vx = 0; k->age = 0;
+            } else if (--c->timer <= 0) {
+                k->on = 0; set_idle(c, 30); c->toy = -1;
+            } else {
+                step_to(c, c->x + dx * (c->spd + 20) / len, c->y + dy * (c->spd + 20) / len);
+                c->vx = 1;
+            }
+            break;
+        }
+        k->age++;
+        uint8_t stage = k->age < 80 ? 1 : (k->age < 180 ? 2 : 3);
+        if (stage != k->stage) { k->stage = stage; c->hop = 8; }
+        else if (k->age % 30 == 0) c->hop = 8;
+        if (k->age >= BUILD_FRAMES) {
+            k->stage = 3; k->builder = -1; k->age = 0;
+            c->emote = EM_HEART; c->emoteT = 90; c->hop = 8; c->cool = 200;
+            set_idle(c, 60 + rr(60)); c->toy = -1;
         }
         break;
     }
@@ -472,6 +700,9 @@ void isles_tick(void) {
     for (int i = 0; i < ISL_MAX_CRITTERS; i++)
         if (crit[i].on) update_critter(i);
     pair_interactions();
+    for (int i = 0; i < ISL_MAX_BALLS; i++)
+        if (balls[i].on) { kick_ball(&balls[i]); update_ball(&balls[i]); }
+    for (int i = 0; i < ISL_MAX_CASTLES; i++) update_castle(&castles[i]);
 }
 
 /* ---------------- Drawing ---------------- */
@@ -512,12 +743,63 @@ static void draw_bench_clock(Canvas *c, const Decor *d) {
     gfx_text(c, &font10, x, y, t, dark, 0);
 }
 
-typedef struct { int16_t y; uint8_t kind, id; } DrawItem;  // kind 0 = decor, 1 = critter
+static void blit_sprite(Canvas *c, const uint16_t *tex, int w, int h, int x, int y) {
+    for (int yy = 0; yy < h; yy++) {
+        int py = y + yy;
+        if (py < c->cy0 || py >= c->cy1) continue;
+        for (int xx = 0; xx < w; xx++) {
+            int pxx = x + xx;
+            if (pxx < c->cx0 || pxx >= c->cx1) continue;
+            uint16_t v = tex[yy * w + xx];
+            if (v & 0x8000) c->buf[py * SCREEN_W + pxx] = (tintSprites && !tintIdentity) ? tint_px(v) : v;
+        }
+    }
+}
+
+static void sand_rect(Canvas *c, int x, int y, int w, int h, px col) {
+    gfx_fill(c, x, y, w, h, tintIdentity ? col : tint_px(col));
+}
+
+static void draw_castle(Canvas *c, const Castle *k) {
+    const px lite = RGB8(240, 222, 160), mid = RGB8(214, 192, 122), dark = RGB8(136, 112, 62);
+    const px door = RGB8(86, 66, 36), pole = RGB8(110, 80, 50), flag = RGB8(230, 60, 60);
+    int fx = k->x, fy = k->y;
+    if (k->stage == 0) return;
+    shade_ellipse(c, fx, fy - 1);
+    if (k->stage == 1) {
+        sand_rect(c, fx - 5, fy - 3, 10, 3, mid);
+        sand_rect(c, fx - 3, fy - 5, 6, 2, lite);
+        sand_rect(c, fx - 5, fy - 1, 10, 1, dark);
+    } else if (k->stage == 2) {
+        sand_rect(c, fx - 7, fy - 4, 14, 4, mid);
+        sand_rect(c, fx - 7, fy - 1, 14, 1, dark);
+        sand_rect(c, fx - 4, fy - 8, 8, 4, lite);
+        sand_rect(c, fx + 3, fy - 8, 1, 4, mid);
+    } else {
+        sand_rect(c, fx - 8, fy - 5, 16, 5, mid);
+        sand_rect(c, fx - 8, fy - 1, 16, 1, dark);
+        sand_rect(c, fx - 8, fy - 11, 5, 6, lite);       // left tower
+        sand_rect(c, fx - 4, fy - 11, 1, 6, mid);
+        sand_rect(c, fx + 3, fy - 11, 5, 6, lite);       // right tower
+        sand_rect(c, fx + 7, fy - 11, 1, 6, mid);
+        for (int i = 0; i < 3; i++) {
+            sand_rect(c, fx - 8 + i * 2, fy - 12, 1, 1, lite);
+            sand_rect(c, fx + 3 + i * 2, fy - 12, 1, 1, lite);
+            sand_rect(c, fx - 3 + i * 2, fy - 10, 1, 1, lite);
+        }
+        sand_rect(c, fx - 3, fy - 9, 6, 4, lite);        // keep
+        sand_rect(c, fx - 1, fy - 4, 2, 4, door);
+        sand_rect(c, fx, fy - 16, 1, 6, pole);
+        sand_rect(c, fx + 1, fy - 16, 3, 2, flag);
+    }
+}
+
+typedef struct { int16_t y; uint8_t kind, id; } DrawItem;  // kind 0 = decor, 1 = critter, 2 = ball, 3 = castle
 
 void isles_draw(Canvas *c) {
     static const uint8_t hopTab[8] = {0, 2, 4, 5, 5, 4, 2, 1};
     static const uint8_t walkTab[4] = {0, 1, 2, 1};
-    DrawItem items[ISL_MAX_CRITTERS + DECOR_COUNT];
+    DrawItem items[ISL_MAX_CRITTERS + DECOR_COUNT + ISL_MAX_BALLS + ISL_MAX_CASTLES];
     int n = 0;
     tintSprites = true;
     for (int i = 0; i < DECOR_COUNT; i++)
@@ -528,6 +810,14 @@ void isles_draw(Canvas *c) {
         if (crit[i].on) {
             items[n].y = (int16_t)(crit[i].y >> 8); items[n].kind = 1; items[n].id = (uint8_t)i; n++;
         }
+    for (int i = 0; i < ISL_MAX_BALLS; i++)
+        if (balls[i].on) {
+            items[n].y = (int16_t)(balls[i].y >> 8); items[n].kind = 2; items[n].id = (uint8_t)i; n++;
+        }
+    for (int i = 0; i < ISL_MAX_CASTLES; i++)
+        if (castles[i].on && castles[i].stage > 0) {
+            items[n].y = castles[i].y; items[n].kind = 3; items[n].id = (uint8_t)i; n++;
+        }
     for (int a = 1; a < n; a++) {  // insertion sort by feet y: things lower on screen draw on top
         DrawItem t = items[a];
         int b = a - 1;
@@ -537,6 +827,17 @@ void isles_draw(Canvas *c) {
 
     int lift[ISL_MAX_CRITTERS];
     for (int a = 0; a < n; a++) {
+        if (items[a].kind == 2) {
+            const Ball *b = &balls[items[a].id];
+            int x = (int)(b->x >> 8), y = (int)(b->y >> 8), z = (int)(b->z >> 8);
+            shade_ellipse(c, x, y - 1);
+            blit_sprite(c, toy_rgb[TOY_BALL], 16, 16, x - 8, y - 14 - z);
+            continue;
+        }
+        if (items[a].kind == 3) {
+            draw_castle(c, &castles[items[a].id]);
+            continue;
+        }
         if (items[a].kind == 0) {
             const Decor *d = &DECOR[items[a].id];
             const ObjSprite *o = &isl_objs[d->obj];
@@ -549,11 +850,12 @@ void isles_draw(Canvas *c) {
         int x = (int)(k->x >> 8), y = (int)(k->y >> 8);
         int up = 0;
         if (k->hop > 0) up = hopTab[k->hop > 8 ? 7 : k->hop - 1];
-        else if (k->state == ST_WALK || (k->state == ST_FOLLOW && k->vx)) up = walkTab[((frameNo >> 3) + id) & 3];
+        else if (k->state == ST_WALK || ((k->state == ST_FOLLOW || k->state == ST_PLAY || k->state == ST_BUILD) && k->vx)) up = walkTab[((frameNo >> 3) + id) & 3];
         lift[id] = up;
         shade_ellipse(c, x, y - 1);
         if (tintIdentity) gfx_blit16(c, icon_rgb[k->up], x - 8, y - 15 - up, 0);
         else blit16_tint(c, icon_rgb[k->up], x - 8, y - 15 - up);
+        if (k->state == ST_BUILD) blit_sprite(c, shovel_small_rgb, 8, 8, x + 6, y - 9 - up);
     }
     tintSprites = false;  // emotes and the hint panel stay bright so they read at night
     for (int a = 0; a < n; a++)  // emotes on top of everything
@@ -575,6 +877,8 @@ void isles_init(px *bg, uint32_t seed) {
     bgBuf = bg;
     rngState = seed ? seed : 0x1234567u;
     memset(crit, 0, sizeof crit);
+    memset(balls, 0, sizeof balls);
+    memset(castles, 0, sizeof castles);
     build_terrain();
     tintBaked = false;
     isles_update_clock();

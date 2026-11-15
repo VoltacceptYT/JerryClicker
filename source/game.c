@@ -34,6 +34,11 @@ const UpgradeDef UPGRADES[UPGRADE_COUNT] = {
     {"pet_item_iron_jerry", "Pet Item: Iron Totem", "Converts Jerry into Iron Jerry", 25000000, UP_COSMETIC, 1},
 };
 
+const ToyDef TOYS[TOY_COUNT] = {
+    {"beach_ball", "Beach Ball", "Bounces around", 25000},
+    {"plastic_shovel", "Plastic Shovel", "Builds sandcastles", 100000},
+};
+
 static double frenzy_mult(const Game *g) { return g->frenzyFrames > 0 ? 2.0 : 1.0; }
 
 void game_init(Game *g) {
@@ -120,6 +125,24 @@ static int idx_of(const char *id) {
     return 0;
 }
 
+double game_toy_cost(const Game *g, int toy) {
+    return TOYS[toy].cost * pow(TOY_GROWTH, g->s.toys[toy]);
+}
+
+bool game_toy_maxed(const Game *g, int toy) { return g->s.toys[toy] >= TOY_MAX; }
+
+bool game_can_buy_toy(const Game *g, int toy) {
+    if (toy < 0 || toy >= TOY_COUNT || game_toy_maxed(g, toy)) return false;
+    return g->s.candies >= game_toy_cost(g, toy);
+}
+
+bool game_buy_toy(Game *g, int toy) {
+    if (!game_can_buy_toy(g, toy)) return false;
+    g->s.candies -= game_toy_cost(g, toy);
+    g->s.toys[toy]++;
+    return true;
+}
+
 bool game_prestige_unlocked(const Game *g) {
     return g->s.up[idx_of("aspect_of_the_jerry")].count > 0;
 }
@@ -183,10 +206,10 @@ typedef struct {
     uint32_t checksum;
 } SaveBlob;
 
-static uint32_t checksum(const GameState *s) {
-    const uint8_t *p = (const uint8_t *)s;
+static uint32_t checksum_bytes(const void *data, size_t n) {
+    const uint8_t *p = (const uint8_t *)data;
     uint32_t h = 2166136261u;
-    for (size_t i = 0; i < sizeof(*s); i++) {
+    for (size_t i = 0; i < n; i++) {
         h ^= p[i];
         h *= 16777619u;
     }
@@ -201,9 +224,26 @@ void game_pack(const Game *g, uint8_t *out) {
     b.magic = SAVE_MAGIC;
     b.size = (uint32_t)sizeof(SaveBlob);
     b.state = g->s;
-    b.checksum = checksum(&b.state);
+    b.checksum = checksum_bytes(&b.state, sizeof(b.state));
     memcpy(out, &b, sizeof(b));
 }
+
+/* Saves from before the toys update: same as GameState without the toy counts. */
+typedef struct {
+    double candies;
+    double perClick;
+    double autoRate;
+    UpgradeState up[UPGRADE_COUNT];
+    int32_t prestigeLevel;
+    double prestigeMult;
+} PreToysState;
+
+typedef struct {
+    uint32_t magic;
+    uint32_t size;
+    PreToysState state;
+    uint32_t checksum;
+} PreToysBlob;
 
 /* Saves from before the Jerryseed/Jerryflower/Dye update held 22 upgrades in this order. */
 #define LEGACY_COUNT 22
@@ -232,40 +272,36 @@ typedef struct {
     uint32_t checksum;
 } LegacyBlob;
 
-static uint32_t checksum_legacy(const LegacyState *s) {
-    const uint8_t *p = (const uint8_t *)s;
-    uint32_t h = 2166136261u;
-    for (size_t i = 0; i < sizeof(*s); i++) {
-        h ^= p[i];
-        h *= 16777619u;
-    }
-    return h;
-}
-
 static bool sane(double v) { return isfinite(v) && v >= 0; }
 
 bool game_unpack(Game *g, const uint8_t *in, size_t len) {
     GameState cur;
-    bool haveCur = false;
     memset(&cur, 0, sizeof(cur));
+    uint32_t magic = 0, size = 0;
+    if (len < 8) return false;
+    memcpy(&magic, in, 4);
+    memcpy(&size, in + 4, 4);
+    if (magic != SAVE_MAGIC) return false;
 
-    if (len >= sizeof(SaveBlob)) {
+    if (size == sizeof(SaveBlob) && len >= sizeof(SaveBlob)) {
         SaveBlob b;
         memcpy(&b, in, sizeof(b));
-        if (b.magic == SAVE_MAGIC && b.size == sizeof(SaveBlob)) {
-            if (b.checksum != checksum(&b.state)) return false;
-            cur = b.state;
-            haveCur = true;
-        } else if (b.magic != SAVE_MAGIC || b.size != sizeof(LegacyBlob)) {
-            return false;
-        }
-    }
-    if (!haveCur) {
-        if (len < sizeof(LegacyBlob)) return false;
+        if (b.checksum != checksum_bytes(&b.state, sizeof(b.state))) return false;
+        cur = b.state;
+    } else if (size == sizeof(PreToysBlob) && len >= sizeof(PreToysBlob)) {
+        PreToysBlob b;
+        memcpy(&b, in, sizeof(b));
+        if (b.checksum != checksum_bytes(&b.state, sizeof(b.state))) return false;
+        cur.candies = b.state.candies;
+        cur.perClick = b.state.perClick;
+        cur.autoRate = b.state.autoRate;
+        memcpy(cur.up, b.state.up, sizeof(cur.up));
+        cur.prestigeLevel = b.state.prestigeLevel;
+        cur.prestigeMult = b.state.prestigeMult;
+    } else if (size == sizeof(LegacyBlob) && len >= sizeof(LegacyBlob)) {
         LegacyBlob lb;
         memcpy(&lb, in, sizeof(lb));
-        if (lb.magic != SAVE_MAGIC || lb.size != sizeof(LegacyBlob)) return false;
-        if (lb.checksum != checksum_legacy(&lb.state)) return false;
+        if (lb.checksum != checksum_bytes(&lb.state, sizeof(lb.state))) return false;
         cur.candies = lb.state.candies;
         cur.perClick = lb.state.perClick;
         cur.autoRate = lb.state.autoRate;
@@ -275,6 +311,8 @@ bool game_unpack(Game *g, const uint8_t *in, size_t len) {
             int idx = idx_of(LEGACY_IDS[i]);
             cur.up[idx].count = lb.state.up[i].count;
         }
+    } else {
+        return false;
     }
 
     GameState *s = &cur;
@@ -283,6 +321,10 @@ bool game_unpack(Game *g, const uint8_t *in, size_t len) {
     for (int i = 0; i < UPGRADE_COUNT; i++) {
         if (s->up[i].count < 0 || s->up[i].count > 100000) return false;
         s->up[i].cost = UPGRADES[i].cost * pow(COST_GROWTH, s->up[i].count);
+    }
+    for (int i = 0; i < TOY_COUNT; i++) {
+        if (s->toys[i] < 0) return false;
+        if (s->toys[i] > TOY_MAX) s->toys[i] = TOY_MAX;
     }
     game_init(g);
     g->s = *s;

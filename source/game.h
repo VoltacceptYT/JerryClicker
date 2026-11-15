@@ -11,6 +11,11 @@
 #define UPGRADE_COUNT 27
 #define FRENZY_FRAMES (30 * 60)
 
+#define TOY_COUNT 2
+#define TOY_MAX 4        // most of each toy you can own
+#define TOY_GROWTH 2.0   // each purchase of a toy doubles its price
+enum { TOY_BALL, TOY_SHOVEL };
+
 typedef enum {
     UP_AUTO,
     UP_CLICK,
@@ -32,6 +37,15 @@ typedef struct {
 extern const UpgradeDef UPGRADES[UPGRADE_COUNT];
 
 typedef struct {
+    const char *id;
+    const char *name;
+    const char *effect;
+    double cost;
+} ToyDef;
+
+extern const ToyDef TOYS[TOY_COUNT];
+
+typedef struct {
     int32_t count;
     double cost;
 } UpgradeState;
@@ -43,6 +57,7 @@ typedef struct {
     UpgradeState up[UPGRADE_COUNT];
     int32_t prestigeLevel;
     double prestigeMult;
+    int32_t toys[TOY_COUNT]; // kept across prestige
 } GameState;
 
 typedef struct {
@@ -67,6 +82,11 @@ bool game_is_maxed(const Game *g, int idx);
 bool game_can_buy(const Game *g, int idx);
 bool game_buy(Game *g, int idx);
 int game_active_cosmetic(const Game *g); // upgrade index or -1
+
+double game_toy_cost(const Game *g, int toy);
+bool game_toy_maxed(const Game *g, int toy);
+bool game_can_buy_toy(const Game *g, int toy);
+bool game_buy_toy(Game *g, int toy);
 
 bool game_prestige_unlocked(const Game *g);
 double game_prestige_requirement(const Game *g);
