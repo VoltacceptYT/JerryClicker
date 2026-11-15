@@ -22,12 +22,12 @@
 #define UI_BTN_R_X 136
 #define UI_BTN_W 116
 
-// Jerry Isles bottom screen: the toy shop replaces Jerry (two cards side by side)
-#define UI_TOY_Y 71
-#define UI_TOY_H 62
-#define UI_TOY_W 118
+// Jerry Isles bottom screen: the toy store replaces Jerry (two shop windows side by side)
+#define UI_TOY_Y 83
+#define UI_TOY_H 50
+#define UI_TOY_W 112
 #define UI_TOY_X0 8
-#define UI_TOY_X1 130
+#define UI_TOY_X1 136
 
 typedef struct {
     const Game *game;

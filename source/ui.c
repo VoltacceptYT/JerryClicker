@@ -117,44 +117,69 @@ static void blit16_x2(Canvas *c, const uint16_t *tex, int x, int y) {
         }
 }
 
-static void toy_card(Canvas *c, const Game *g, int t, int x, bool selected) {
-    char a[48], b[48];
+static void blit_rect(Canvas *c, const uint16_t *tex, int w, int h, int x, int y) {
+    for (int yy = 0; yy < h; yy++) {
+        int py = y + yy;
+        if (py < c->cy0 || py >= c->cy1) continue;
+        for (int xx = 0; xx < w; xx++) {
+            int pxx = x + xx;
+            if (pxx < c->cx0 || pxx >= c->cx1) continue;
+            uint16_t v = tex[yy * w + xx];
+            if (v & 0x8000) c->buf[py * SCREEN_W + pxx] = v;
+        }
+    }
+}
+
+#define C_WOOD_FILL RGB8(110, 72, 44)
+#define C_WOOD_LIGHT RGB8(175, 126, 87)
+#define C_WOOD_DARK RGB8(60, 52, 48)
+
+static void wood_panel(Canvas *c, int x, int y, int w, int h) {
+    gfx_bevel_panel(c, x, y, w, h, C_WOOD_FILL, C_WOOD_LIGHT, C_WOOD_DARK);
+}
+
+static void toy_window(Canvas *c, const Game *g, int t, int x, bool selected) {
+    char a[48];
     bool maxed = game_toy_maxed(g, t);
     bool afford = game_can_buy_toy(g, t);
-    px fill, light, dark, nameCol, costCol;
-    if (maxed) {
-        fill = RGB8(0, 51, 0); light = RGB8(0, 100, 0); dark = RGB8(0, 20, 0);
-        nameCol = C_WHITE; costCol = C_GREEN;
-    } else if (afford) {
-        fill = RGB8(48, 48, 48); light = RGB8(110, 110, 110); dark = RGB8(16, 16, 16);
-        nameCol = C_WHITE; costCol = C_GREEN;
-    } else {
-        fill = RGB8(70, 10, 10); light = RGB8(122, 0, 0); dark = RGB8(28, 0, 0);
-        nameCol = C_DIM; costCol = C_RED;
-    }
     int y = UI_TOY_Y;
-    gfx_bevel_panel(c, x, y, UI_TOY_W, UI_TOY_H, fill, light, dark);
-    gfx_text_centered(c, &font10, x + UI_TOY_W / 2, y + 4, TOYS[t].name, nameCol, 1);
+    gfx_nineslice(c, tex_shop_window, x, y, UI_TOY_W, UI_TOY_H);
+    gfx_text_centered(c, &font10, x + UI_TOY_W / 2, y + 4, TOYS[t].name, C_WHITE, 1);
 
-    gfx_bevel_panel(c, x + 6, y + 15, 36, 36, RGB8(40, 40, 40), RGB8(16, 16, 16), RGB8(100, 100, 100));
-    blit16_x2(c, toy_rgb[t], x + 8, y + 17);
-    if (!afford && !maxed) gfx_blit16(c, tex_locked, x + 16, y + 25, 1);
+    blit16_x2(c, toy_rgb[t], x + 8, y + 14);
+    if (!afford && !maxed) gfx_blit16(c, tex_locked, x + 16, y + 22, 1);
 
     snprintf(a, sizeof a, "OWNED %d/%d", (int)g->s.toys[t], TOY_MAX);
-    gfx_text(c, &font10, x + 48, y + 17, a, C_GOLD, 1);
+    gfx_text(c, &font10, x + 46, y + 15, a, C_WHITE, 1);
+
+    int tx = x + 46, ty = y + 27, tw = 60, th = 17;
+    wood_panel(c, tx, ty, tw, th);
     if (maxed) {
-        gfx_text(c, &font10, x + 48, y + 33, "MAXED", C_GREEN, 1);
+        gfx_text_centered(c, &font10, tx + tw / 2, ty + 4, "SOLD OUT", C_GREEN, 1);
     } else {
-        gfx_text(c, &font10, x + 48, y + 29, "COST", C_DIM, 0);
-        format_number(game_toy_cost(g, t), b, sizeof b);
-        gfx_text(c, &font10, x + 48, y + 39, b, costCol, 0);
+        double cost = game_toy_cost(g, t);
+        if (cost < 1000) snprintf(a, sizeof a, "%d", (int)cost);
+        else format_number(cost, a, sizeof a);
+        gfx_blit16(c, candy_rgb, tx + 2, ty + 1, 0);
+        gfx_text(c, &font10, tx + 21, ty + 4, a, afford ? C_GREEN : RGB8(255, 120, 120), 1);
     }
-    gfx_text_centered(c, &font10, x + UI_TOY_W / 2, y + 52, TOYS[t].effect, C_DIM, 0);
 
     if (selected) {
-        gfx_frame(c, x, y, UI_TOY_W, UI_TOY_H, C_GOLD);
-        gfx_frame(c, x + 1, y + 1, UI_TOY_W - 2, UI_TOY_H - 2, RGB8(200, 130, 0));
+        gfx_frame(c, x - 1, y - 1, UI_TOY_W + 2, UI_TOY_H + 2, C_GOLD);
+        gfx_frame(c, x - 2, y - 2, UI_TOY_W + 4, UI_TOY_H + 4, RGB8(200, 130, 0));
     }
+}
+
+static void toy_store(Canvas *c, const Game *g, int sel) {
+    gfx_tile(c, tex_shop_wall, 5, 68, 246, 66);
+    gfx_clip(c, 5, 68, 246, 13);
+    for (int x = 5; x < 251; x += 12) blit_rect(c, shop_awning, 12, 13, x, 68);
+    gfx_unclip(c);
+    wood_panel(c, 88, 70, 80, 13);
+    gfx_text_centered(c, &font10, 128, 73, "JERRY TOYS", C_GOLD, 1);
+    gfx_blit16(c, shop_plant, 120, UI_TOY_Y + UI_TOY_H - 16, 0);
+    toy_window(c, g, TOY_BALL, UI_TOY_X0, sel == TOY_BALL);
+    toy_window(c, g, TOY_SHOVEL, UI_TOY_X1, sel == TOY_SHOVEL);
 }
 
 // pressed: draw the _active texture and nudge the label down 1px
@@ -189,8 +214,7 @@ void ui_draw_bottom(px *fb, const px *bg, const UiView *v) {
     // Jerry stage (Jerry himself is a hardware sprite)
     gfx_bevel_panel(&c, 4, 67, 248, 68, RGB8(26, 26, 26), RGB8(0, 0, 0), RGB8(85, 85, 85));
     if (v->page == PAGE_ISLES) {
-        toy_card(&c, g, TOY_BALL, UI_TOY_X0, v->toySel == TOY_BALL);
-        toy_card(&c, g, TOY_SHOVEL, UI_TOY_X1, v->toySel == TOY_SHOVEL);
+        toy_store(&c, g, v->toySel);
     }
 
     if (game_prestige_unlocked(g) || g->s.prestigeLevel > 0) {

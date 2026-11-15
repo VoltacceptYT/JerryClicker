@@ -13,7 +13,7 @@
 
 #define TOY_COUNT 2
 #define TOY_MAX 4        // most of each toy you can own
-#define TOY_GROWTH 2.0   // each purchase of a toy doubles its price
+#define TOY_GROWTH 1.0   // flat price: every ball / shovel costs the same
 enum { TOY_BALL, TOY_SHOVEL };
 
 typedef enum {

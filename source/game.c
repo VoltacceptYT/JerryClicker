@@ -35,8 +35,8 @@ const UpgradeDef UPGRADES[UPGRADE_COUNT] = {
 };
 
 const ToyDef TOYS[TOY_COUNT] = {
-    {"beach_ball", "Beach Ball", "Bounces around", 25000},
-    {"plastic_shovel", "Plastic Shovel", "Builds sandcastles", 100000},
+    {"beach_ball", "Beach Ball", "Bounces around", 250},
+    {"plastic_shovel", "Plastic Shovel", "Builds sandcastles", 500},
 };
 
 static double frenzy_mult(const Game *g) { return g->frenzyFrames > 0 ? 2.0 : 1.0; }

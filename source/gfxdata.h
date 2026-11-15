@@ -17,6 +17,10 @@ extern const uint16_t tex_button_active[256];
 extern const uint16_t tex_ok_active[256];
 extern const uint16_t tex_cancel_active[256];
 extern const uint16_t tex_prestige_active[256];
+extern const uint16_t shop_awning[156];
+extern const uint16_t tex_shop_window[256];
+extern const uint16_t tex_shop_wall[256];
+extern const uint16_t shop_plant[256];
 extern const uint16_t icon_rgb[ICON_COUNT][256]; /* 16x16 ARGB1555 */
 extern const uint16_t toy_rgb[TOY_ICONS][256]; /* beach ball, plastic shovel */
 extern const uint16_t shovel_small_rgb[64]; /* 8x8 shovel carried by building critters */
