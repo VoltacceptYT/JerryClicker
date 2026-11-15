@@ -19,7 +19,7 @@ UPGRADE_IDS = [
     "aspect_of_the_jerry_signature", "dye_jerry", "pet_item_toy_jerry", "pet_item_lord_jerry",
     "pet_item_scuba_jerry", "pet_item_angel_jerry", "pet_item_iron_jerry",
 ]
-TOY_IDS = ["beach_ball", "plastic_shovel"]  # must match TOYS[] in source/game.c
+TOY_IDS = ["beach_ball", "plastic_shovel", "squeaky_mouse", "magic_8_ball", "balloon_snake", "white_dice"]  # must match TOYS[] in source/game.c
 JERRIES = ["jerry", "lord_jerry", "scuba_jerry", "iron_jerry", "angel_jerry"]
 
 
@@ -191,7 +191,7 @@ def make_gfxdata(icons, candy, toys, shovel_small):
     out.append("const uint16_t shovel_small_rgb[64] = {%s};" % ",".join(str(argb1555(p)) for p in shovel_small.getdata()))
     out.append("const uint16_t candy_rgb[256] = {%s};" % ",".join(str(argb1555(p)) for p in candy.getdata()))
     hdr += ["extern const uint16_t icon_rgb[ICON_COUNT][256]; /* 16x16 ARGB1555 */",
-            "extern const uint16_t toy_rgb[TOY_ICONS][256]; /* beach ball, plastic shovel */",
+            "extern const uint16_t toy_rgb[TOY_ICONS][256]; /* beach ball, shovel, mouse, 8-ball, balloon snake, white dice */",
             "extern const uint16_t shovel_small_rgb[64]; /* 8x8 shovel carried by building critters */",
             "extern const uint16_t candy_rgb[256];", "#endif"]
     open(os.path.join(ROOT, "source", "gfxdata.c"), "w").write("\n".join(out) + "\n")

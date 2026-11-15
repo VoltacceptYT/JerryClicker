@@ -138,30 +138,43 @@ static void wood_panel(Canvas *c, int x, int y, int w, int h) {
     gfx_bevel_panel(c, x, y, w, h, C_WOOD_FILL, C_WOOD_LIGHT, C_WOOD_DARK);
 }
 
-static void toy_window(Canvas *c, const Game *g, int t, int x, bool selected) {
+static const char *toy_label(int t) {  // short names that fit a shop window
+    static const char *const L[TOY_COUNT] = {"Beach Ball", "Shovel", "Mouse", "8-Ball", "Balloon", "Dice"};
+    return L[t];
+}
+
+static int toy_x(int t) { return UI_TOY_X0 + (t % UI_TOY_COLS) * UI_TOY_PITCH_X; }
+static int toy_y(int t) { return UI_TOY_Y0 + (t / UI_TOY_COLS) * UI_TOY_PITCH_Y; }
+
+int ui_toy_at(int x, int y) {
+    for (int t = 0; t < TOY_COUNT; t++)
+        if (x >= toy_x(t) && x < toy_x(t) + UI_TOY_W && y >= toy_y(t) && y < toy_y(t) + UI_TOY_H) return t;
+    return -1;
+}
+
+static void toy_window(Canvas *c, const Game *g, int t, bool selected) {
     char a[48];
     bool maxed = game_toy_maxed(g, t);
     bool afford = game_can_buy_toy(g, t);
-    int y = UI_TOY_Y;
+    int x = toy_x(t), y = toy_y(t);
     gfx_nineslice(c, tex_shop_window, x, y, UI_TOY_W, UI_TOY_H);
-    gfx_text_centered(c, &font10, x + UI_TOY_W / 2, y + 4, TOYS[t].name, C_WHITE, 1);
+    gfx_text_centered(c, &font10, x + UI_TOY_W / 2, y + 4, toy_label(t), C_WHITE, 1);
 
-    blit16_x2(c, toy_rgb[t], x + 8, y + 14);
-    if (!afford && !maxed) gfx_blit16(c, tex_locked, x + 16, y + 22, 1);
+    blit16_x2(c, toy_rgb[t], x + 6, y + 15);
+    if (!afford && !maxed) gfx_blit16(c, tex_locked, x + 14, y + 23, 1);
 
-    snprintf(a, sizeof a, "OWNED %d/%d", (int)g->s.toys[t], TOY_MAX);
-    gfx_text(c, &font10, x + 46, y + 15, a, C_WHITE, 1);
+    snprintf(a, sizeof a, "%d/%d", (int)g->s.toys[t], TOY_MAX);
+    gfx_text_centered(c, &font10, x + 58, y + 16, a, maxed ? C_GREEN : C_WHITE, 1);
 
-    int tx = x + 46, ty = y + 27, tw = 60, th = 17;
+    int tx = x + 41, ty = y + 28, tw = 35, th = 17;
     wood_panel(c, tx, ty, tw, th);
     if (maxed) {
-        gfx_text_centered(c, &font10, tx + tw / 2, ty + 4, "SOLD OUT", C_GREEN, 1);
+        gfx_text_centered(c, &font10, tx + tw / 2, ty + 4, "MAX", C_GREEN, 1);
     } else {
         double cost = game_toy_cost(g, t);
         if (cost < 1000) snprintf(a, sizeof a, "%d", (int)cost);
         else format_number(cost, a, sizeof a);
-        gfx_blit16(c, candy_rgb, tx + 2, ty + 1, 0);
-        gfx_text(c, &font10, tx + 21, ty + 4, a, afford ? C_GREEN : RGB8(255, 120, 120), 1);
+        gfx_text_centered(c, &font10, tx + tw / 2, ty + 4, a, afford ? C_GREEN : RGB8(255, 120, 120), 1);
     }
 
     if (selected) {
@@ -170,16 +183,43 @@ static void toy_window(Canvas *c, const Game *g, int t, int x, bool selected) {
     }
 }
 
-static void toy_store(Canvas *c, const Game *g, int sel) {
-    gfx_tile(c, tex_shop_wall, 5, 68, 246, 66);
-    gfx_clip(c, 5, 68, 246, 13);
-    for (int x = 5; x < 251; x += 12) blit_rect(c, shop_awning, 12, 13, x, 68);
+// The whole bottom screen: shop wall, awning, sign with the candy count, the toy windows and a counter.
+static void toy_store_screen(Canvas *c, const Game *g, const UiView *v) {
+    char a[96];
+    gfx_tile(c, tex_shop_wall, 0, 0, SCREEN_W, 162);
+    gfx_clip(c, 0, 0, SCREEN_W, 13);
+    for (int x = 0; x < SCREEN_W; x += 12) blit_rect(c, shop_awning, 12, 13, x, 0);
     gfx_unclip(c);
-    wood_panel(c, 88, 70, 80, 13);
-    gfx_text_centered(c, &font10, 128, 73, "JERRY TOYS", C_GOLD, 1);
-    gfx_blit16(c, shop_plant, 120, UI_TOY_Y + UI_TOY_H - 16, 0);
-    toy_window(c, g, TOY_BALL, UI_TOY_X0, sel == TOY_BALL);
-    toy_window(c, g, TOY_SHOVEL, UI_TOY_X1, sel == TOY_SHOVEL);
+
+    // Sign: shop name on the left, candy balance on the right
+    wood_panel(c, 4, 16, 72, 15);
+    gfx_text_centered(c, &font10, 40, 20, "JERRY TOYS", C_GOLD, 1);
+    format_number(g->s.candies, a, sizeof a);
+    int tw = gfx_text_width(&font10, a);
+    gfx_text_right(c, &font10, 250, 20, a, C_WHITE, 1);
+    gfx_blit16(c, candy_rgb, 250 - tw - 18, 16, 0);
+
+    for (int t = 0; t < TOY_COUNT; t++) toy_window(c, g, t, t == v->toySel);
+
+    // Counter along the bottom (the buttons are drawn on it)
+    wood_panel(c, 0, 160, SCREEN_W, 32);
+
+    if (v->confirmPrestige || v->msgTimer > 0) {
+        px col = v->confirmPrestige ? C_GOLD : C_WHITE;
+        gfx_text_centered(c, &font10, 128, 143, v->msg0 ? v->msg0 : "", col, 1);
+        gfx_text_centered(c, &font10, 128, 151, v->msg1 ? v->msg1 : "", col, 1);
+        return;
+    }
+    if (game_prestige_unlocked(g) || g->s.prestigeLevel > 0) {
+        snprintf(a, sizeof a, "PRESTIGE X%.1f (LV %d)", g->s.prestigeMult, (int)g->s.prestigeLevel);
+        gfx_text(c, &font10, 6, 142, a, C_PURPLE, 1);
+    }
+    if (g->frenzyFrames > 0) {
+        snprintf(a, sizeof a, "FRENZY! 2X  %ds", g->frenzyFrames / 60 + 1);
+        gfx_text_right(c, &font10, 250, 142, a, C_GOLD, 1);
+    }
+    gfx_text_centered(c, &font10, 128, 152, TOYS[v->toySel].effect, C_WHITE, 1);
+    if (v->saveStatus && v->saveStatus[0]) gfx_text_right(c, &font10, 252, 152, v->saveStatus, C_DIM, 0);
 }
 
 // pressed: draw the _active texture and nudge the label down 1px
@@ -194,6 +234,11 @@ void ui_draw_bottom(px *fb, const px *bg, const UiView *v) {
     gfx_begin(&c, fb);
     const Game *g = v->game;
     char a[96], b[96];
+
+    if (v->page == PAGE_ISLES) {
+        toy_store_screen(&c, g, v);
+        goto buttons;
+    }
 
     // Stats
     panel(&c, 4, 3, 248, 34);
@@ -213,9 +258,6 @@ void ui_draw_bottom(px *fb, const px *bg, const UiView *v) {
 
     // Jerry stage (Jerry himself is a hardware sprite)
     gfx_bevel_panel(&c, 4, 67, 248, 68, RGB8(26, 26, 26), RGB8(0, 0, 0), RGB8(85, 85, 85));
-    if (v->page == PAGE_ISLES) {
-        toy_store(&c, g, v->toySel);
-    }
 
     if (game_prestige_unlocked(g) || g->s.prestigeLevel > 0) {
         snprintf(a, sizeof a, "PRESTIGE X%.1f (LV %d)", g->s.prestigeMult, (int)g->s.prestigeLevel);
@@ -235,6 +277,7 @@ void ui_draw_bottom(px *fb, const px *bg, const UiView *v) {
         gfx_text_centered(&c, &font10, 128, 155, v->saveStatus, C_DIM, 0);
     }
 
+buttons:
     // Buttons
     if (v->confirmPrestige) {
         button(&c, tex_ok, tex_ok_active, UI_BTN_L_X, "YES", C_WHITE, v->pressedBtn == 1);

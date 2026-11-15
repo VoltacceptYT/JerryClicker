@@ -3,7 +3,7 @@
 #define GFXDATA_H
 #include <stdint.h>
 #define ICON_COUNT 27
-#define TOY_ICONS 2
+#define TOY_ICONS 6
 typedef struct { const uint16_t *rows; const uint8_t *adv; int height; } Font;
 extern const Font font10;
 extern const Font font14;
@@ -22,7 +22,7 @@ extern const uint16_t tex_shop_window[256];
 extern const uint16_t tex_shop_wall[256];
 extern const uint16_t shop_plant[256];
 extern const uint16_t icon_rgb[ICON_COUNT][256]; /* 16x16 ARGB1555 */
-extern const uint16_t toy_rgb[TOY_ICONS][256]; /* beach ball, plastic shovel */
+extern const uint16_t toy_rgb[TOY_ICONS][256]; /* beach ball, shovel, mouse, 8-ball, balloon snake, white dice */
 extern const uint16_t shovel_small_rgb[64]; /* 8x8 shovel carried by building critters */
 extern const uint16_t candy_rgb[256];
 #endif

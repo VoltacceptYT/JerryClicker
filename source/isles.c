@@ -387,9 +387,12 @@ static void step_to(Critter *c, int32_t nx, int32_t ny) {  // slide along walls 
 }
 
 /* ---------------- Toys ----------------
- * Beach balls (Game.toys[TOY_BALL]): real little bounces. Critters kick the ball away from themselves,
- * it arcs through the air, hops off the ground losing a bit of height each time and ricochets off water,
- * palms and rocks. Idle critters sometimes chase one.
+ * Playthings (beach ball, squeaky mouse, magic 8-ball, balloon snake, golden ball) all share the Ball
+ * simulation, tuned per kind in BALL_KIND[]. Critters kick a toy away from themselves, it arcs through the
+ * air, hops off the ground losing some height each time and ricochets off water, palms and rocks. Idle
+ * critters sometimes chase one. Beach ball: classic bounce. White dice: critters roll it and the number
+ * they rolled (d20) pops up once it lands. Magic 8-ball: heavy,
+ * barely bounces, rolls far. Squeaky mouse: scurries about on its own. Balloon snake: floats and drifts.
  * Plastic shovels (Game.toys[TOY_SHOVEL]): up to as many critters as there are shovels walk to a sand
  * patch, dig until a sandcastle stands there, and the castle later crumbles away to make room for more. */
 
@@ -400,10 +403,31 @@ static void step_to(Critter *c, int32_t nx, int32_t ny) {  // slide along walls 
 #define CRUMBLE_STEP 30
 
 typedef struct {
-    uint8_t on, cool;
+    uint8_t on, cool, kind; // kind: index into BALL_KIND[]
     int32_t x, y, z;        // ground position and height, 24.8 fixed point (pixels)
     int16_t vx, vy, vz;     // 8.8 px per frame
+    int16_t timer;          // mouse: frames until the next scurry; balloon: frames until the next drift change
+    uint8_t roll, showRoll; // dice: the d20 result of the last throw, and frames left to show it once landed
 } Ball;
+
+typedef struct {
+    uint8_t toy;            // Game.toys[] index
+    int8_t grav;            // 8.8 px/frame^2 (balloons ignore it and hover)
+    int16_t minBounce;      // below this vertical speed the toy just rolls
+    uint8_t bounceNum, bounceDen;   // fraction of the vertical speed kept on each bounce
+    uint8_t fricNum, fricDen;       // ground friction per frame while rolling
+    int16_t kickSpeed, kickRand;    // horizontal kick: base + random
+    int16_t kickUp, kickUpRand;     // vertical kick: base + random
+    uint8_t kickReach;      // how high above the ground a critter can still reach it (px)
+} BallKind;
+
+static const BallKind BALL_KIND[ISL_BALL_KINDS] = {
+    {TOY_BALL,    40, 90, 3, 4, 15, 16, 200, 220, 380, 200, 10},
+    {TOY_MOUSE,   40, 60, 1, 4, 7,  8,  120, 100, 160, 80,  10},
+    {TOY_EIGHT,   48, 80, 1, 2, 31, 32, 230, 200, 240, 120, 10},
+    {TOY_BALLOON, 0,  0,  1, 1, 63, 64, 90,  80,  220, 80,  44},
+    {TOY_DICE,    48, 120, 1, 2, 7, 8,  200, 120, 260, 100, 10},
+};
 
 typedef struct {
     uint8_t on, stage;      // stage 0 = site reserved, nothing dug yet; 1..3 = mound, tower, castle
@@ -414,7 +438,7 @@ typedef struct {
 
 static Ball balls[ISL_MAX_BALLS];
 static Castle castles[ISL_MAX_CASTLES];
-static int ballsWanted, shovelsWanted;
+static int ballsWanted, shovelsWanted;  // ballsWanted: all ball-like toys together
 
 int isles_castle_count(void) {
     int n = 0;
@@ -427,9 +451,11 @@ static bool ball_walk(int32_t fx, int32_t fy) {
     return walk_cell(x, y) && walk_cell(x - 3, y) && walk_cell(x + 3, y);
 }
 
-static void spawn_ball(Ball *b) {
+static void spawn_ball(Ball *b, int kind) {
     memset(b, 0, sizeof *b);
     b->on = 1;
+    b->kind = (uint8_t)kind;
+    b->timer = (int16_t)(30 + rr(90));
     for (int tries = 0; tries < 60; tries++) {
         int cx = rr(COLS), cy = rr(ROWS);
         if (!walk[cy][cx]) continue;
@@ -438,23 +464,52 @@ static void spawn_ball(Ball *b) {
         if (ball_walk(b->x, b->y)) break;
     }
     b->z = (int32_t)70 << 8;  // drops in from above and bounces
+    if (BALL_KIND[kind].toy == TOY_MOUSE) b->z = 0;
 }
 
 static void update_ball(Ball *b) {
+    const BallKind *k = &BALL_KIND[b->kind];
     if (b->cool) b->cool--;
-    b->vz -= BALL_GRAV;
-    b->z += b->vz;
-    if (b->z <= 0) {
-        b->z = 0;
-        if (b->vz < -BALL_MIN_BOUNCE) {
-            b->vz = (int16_t)(-b->vz * 3 / 4);
-            b->vx = (int16_t)(b->vx * 7 / 8);
-            b->vy = (int16_t)(b->vy * 7 / 8);
-        } else {
-            b->vz = 0;
-            b->vx = (int16_t)(b->vx * 15 / 16);
-            b->vy = (int16_t)(b->vy * 15 / 16);
+    if (k->toy == TOY_BALLOON) {
+        // Hover about 24px up, bobbing gently, and drift on a slow random breeze.
+        int32_t target = ((int32_t)24 << 8) + (((frameNo >> 4) & 1) ? 256 : -256);
+        b->vz = (int16_t)(b->vz + (target - b->z) / 48);
+        b->vz = (int16_t)(b->vz * 15 / 16);
+        b->z += b->vz;
+        if (b->z < 0) { b->z = 0; b->vz = 0; }
+        if (--b->timer <= 0) {
+            b->timer = (int16_t)(90 + rr(120));
+            b->vx = (int16_t)(rr(81) - 40);
+            b->vy = (int16_t)(rr(81) - 40);
         }
+        b->vx = (int16_t)(b->vx * k->fricNum / k->fricDen);
+        b->vy = (int16_t)(b->vy * k->fricNum / k->fricDen);
+    } else {
+        if (k->toy == TOY_MOUSE && b->z == 0 && --b->timer <= 0) {
+            // scurry off in a random direction with a little hop
+            b->timer = (int16_t)(60 + rr(120));
+            b->vx = (int16_t)(rr(301) - 150);
+            b->vy = (int16_t)(rr(301) - 150);
+            b->vz = (int16_t)(120 + rr(60));
+        }
+        b->vz = (int16_t)(b->vz - k->grav);
+        b->z += b->vz;
+        if (b->z <= 0) {
+            b->z = 0;
+            if (b->vz < -k->minBounce) {
+                b->vz = (int16_t)(-b->vz * k->bounceNum / k->bounceDen);
+                b->vx = (int16_t)(b->vx * 7 / 8);
+                b->vy = (int16_t)(b->vy * 7 / 8);
+            } else {
+                b->vz = 0;
+                b->vx = (int16_t)(b->vx * k->fricNum / k->fricDen);
+                b->vy = (int16_t)(b->vy * k->fricNum / k->fricDen);
+            }
+        }
+    }
+    if (k->toy == TOY_DICE && b->roll) {  // once it has settled, show what was rolled for a couple of seconds
+        if (b->showRoll) { if (--b->showRoll == 0) b->roll = 0; }
+        else if (b->z == 0 && iabs(b->vx) + iabs(b->vy) < 24) b->showRoll = 150;
     }
     int32_t nx = b->x + b->vx, ny = b->y + b->vy;
     if (ball_walk(nx, ny)) {
@@ -470,7 +525,8 @@ static void update_ball(Ball *b) {
 }
 
 static void kick_ball(Ball *b) {
-    if (b->cool || b->z > ((int32_t)10 << 8)) return;
+    const BallKind *k = &BALL_KIND[b->kind];
+    if (b->cool || b->z > ((int32_t)k->kickReach << 8)) return;
     int bx = (int)(b->x >> 8), by = (int)(b->y >> 8);
     for (int i = 0; i < ISL_MAX_CRITTERS; i++) {
         Critter *c = &crit[i];
@@ -480,10 +536,11 @@ static void kick_ball(Ball *b) {
         int d = dist_approx(dx, dy);
         if (d > 11) continue;
         if (d == 0) { dx = rr(3) - 1; dy = 1; d = iabs(dx) + 1; }
-        int sp = 200 + rr(220);
+        int sp = k->kickSpeed + rr(k->kickRand);
         b->vx = (int16_t)(dx * sp / d + rr(61) - 30);
         b->vy = (int16_t)(dy * sp / d + rr(61) - 30);
-        b->vz = (int16_t)(380 + rr(200));
+        b->vz = (int16_t)(k->kickUp + rr(k->kickUpRand));
+        if (k->toy == TOY_DICE) { b->roll = (uint8_t)(1 + rr(20)); b->showRoll = 0; }
         b->cool = 18;
         c->hop = 8;
         return;
@@ -521,7 +578,7 @@ static bool start_build(Critter *c, int slot) {
 static bool start_play(Critter *c) {
     int best = -1, bestD = 0;
     int px0 = (int)(c->x >> 8), py0 = (int)(c->y >> 8);
-    for (int i = 0; i < ballsWanted && i < ISL_MAX_BALLS; i++) {
+    for (int i = 0; i < ISL_MAX_BALLS; i++) {
         if (!balls[i].on) continue;
         int d = dist_approx((int)(balls[i].x >> 8) - px0, (int)(balls[i].y >> 8) - py0);
         if (best < 0 || d < bestD) { best = i; bestD = d; }
@@ -558,11 +615,18 @@ static void update_castle(Castle *k) {
 }
 
 static void sync_toys(const Game *g) {
-    ballsWanted = g->s.toys[TOY_BALL] > ISL_MAX_BALLS ? ISL_MAX_BALLS : g->s.toys[TOY_BALL];
     shovelsWanted = g->s.toys[TOY_SHOVEL] > TOY_MAX ? TOY_MAX : g->s.toys[TOY_SHOVEL];
-    for (int i = 0; i < ISL_MAX_BALLS; i++) {
-        if (i < ballsWanted && !balls[i].on) spawn_ball(&balls[i]);
-        else if (i >= ballsWanted) balls[i].on = 0;
+    ballsWanted = 0;
+    // Slot layout: kind k owns balls[k * TOY_MAX .. k * TOY_MAX + TOY_MAX - 1].
+    for (int k = 0; k < ISL_BALL_KINDS; k++) {
+        int want = g->s.toys[BALL_KIND[k].toy];
+        if (want > TOY_MAX) want = TOY_MAX;
+        ballsWanted += want;
+        for (int i = 0; i < TOY_MAX; i++) {
+            Ball *b = &balls[k * TOY_MAX + i];
+            if (i < want && !b->on) spawn_ball(b, k);
+            else if (i >= want) b->on = 0;
+        }
     }
 }
 
@@ -831,7 +895,7 @@ void isles_draw(Canvas *c) {
             const Ball *b = &balls[items[a].id];
             int x = (int)(b->x >> 8), y = (int)(b->y >> 8), z = (int)(b->z >> 8);
             shade_ellipse(c, x, y - 1);
-            blit_sprite(c, toy_rgb[TOY_BALL], 16, 16, x - 8, y - 14 - z);
+            blit_sprite(c, toy_rgb[BALL_KIND[b->kind].toy], 16, 16, x - 8, y - 14 - z);
             continue;
         }
         if (items[a].kind == 3) {
@@ -858,11 +922,20 @@ void isles_draw(Canvas *c) {
         if (k->state == ST_BUILD) blit_sprite(c, shovel_small_rgb, 8, 8, x + 6, y - 9 - up);
     }
     tintSprites = false;  // emotes and the hint panel stay bright so they read at night
-    for (int a = 0; a < n; a++)  // emotes on top of everything
+    for (int a = 0; a < n; a++) {  // emotes (and dice results) on top of everything
         if (items[a].kind == 1) {
             int id = items[a].id;
             draw_emote(c, &crit[id], (int)(crit[id].x >> 8), (int)(crit[id].y >> 8) - 27 - lift[id]);
+        } else if (items[a].kind == 2) {
+            const Ball *b = &balls[items[a].id];
+            if (BALL_KIND[b->kind].toy == TOY_DICE && b->showRoll) {
+                char num[8];
+                snprintf(num, sizeof num, "%d", (int)b->roll);
+                px col = b->roll == 20 ? RGB8(255, 170, 0) : (b->roll == 1 ? RGB8(255, 85, 85) : RGB8(255, 255, 255));
+                gfx_text_centered(c, &font10, (int)(b->x >> 8), (int)(b->y >> 8) - 25 - (int)(b->z >> 8), num, col, 1);
+            }
         }
+    }
 
     if (isles_critter_count() == 0) {
         gfx_bevel_panel(c, 34, 120, 188, 28, RGB8(34, 34, 34), RGB8(85, 85, 85), RGB8(0, 0, 0));

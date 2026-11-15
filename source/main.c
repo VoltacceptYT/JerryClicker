@@ -1,7 +1,7 @@
 // Jerry Clicker for Nintendo DS
 //  Bottom screen (touch): stats, Jerry, buttons.   Top screen: pages (Upgrades / Jerry Isles).
 //  Controls: Touch Jerry or B = click | Up/Down = select | L/R = switch page | A = buy
-//            Isles page: touch a toy card (or D-pad + A) to buy it instead of tapping Jerry
+//            Isles page: the whole bottom screen is the toy store: touch a toy (or D-pad + A) to buy it
 //            Start = prestige | Select = music on/off | Touch SAVE / PRESTIGE buttons
 //  Both screens are software-rendered (see gfx.c / ui.c) using the original font and sprites.
 #include <fat.h>
@@ -277,15 +277,8 @@ static void buy_toy(int t) {
         game_buy_toy(&game, t);
         isles_sync(&game);
         snprintf(a, sizeof a, "Bought %s!", TOYS[t].name);
-        set_msg(a, t == TOY_BALL ? "Your critters will play" : "Your critters will build", 120);
+        set_msg(a, t == TOY_SHOVEL ? "Your critters will build" : "Your critters will play", 120);
     }
-}
-
-static int toy_at(int x, int y) {
-    if (y < UI_TOY_Y || y >= UI_TOY_Y + UI_TOY_H) return -1;
-    if (x >= UI_TOY_X0 && x < UI_TOY_X0 + UI_TOY_W) return TOY_BALL;
-    if (x >= UI_TOY_X1 && x < UI_TOY_X1 + UI_TOY_W) return TOY_SHOVEL;
-    return -1;
 }
 
 static void request_prestige(void) {
@@ -396,8 +389,10 @@ int main(void) {
                 }
             }
             if (page == PAGE_ISLES) {
-                if (down & (KEY_LEFT | KEY_UP)) { toySel = TOY_BALL; dirtyBot = true; }
-                if (down & (KEY_RIGHT | KEY_DOWN)) { toySel = TOY_SHOVEL; dirtyBot = true; }
+                if (rep & KEY_LEFT) { toySel = (toySel + TOY_COUNT - 1) % TOY_COUNT; dirtyBot = true; }
+                if (rep & KEY_RIGHT) { toySel = (toySel + 1) % TOY_COUNT; dirtyBot = true; }
+                if (rep & KEY_UP) { toySel = (toySel + TOY_COUNT - UI_TOY_COLS) % TOY_COUNT; dirtyBot = true; }
+                if (rep & KEY_DOWN) { toySel = (toySel + UI_TOY_COLS) % TOY_COUNT; dirtyBot = true; }
                 if (down & KEY_A) { buy_toy(toySel); dirtyBot = true; }
             } else if (down & KEY_B) {
                 do_click(UI_JERRY_X + 32, UI_JERRY_Y + 16);
@@ -425,7 +420,7 @@ int main(void) {
                     if (t.px < 128) save_game();
                     else request_prestige();
                 } else if (page == PAGE_ISLES) {
-                    int ti = toy_at(t.px, t.py);
+                    int ti = ui_toy_at(t.px, t.py);
                     if (ti >= 0) buy_toy(ti);
                 } else if (t.px >= UI_JERRY_X - 12 && t.px < UI_JERRY_X + 76 &&
                            t.py >= UI_JERRY_Y - 8 && t.py < UI_JERRY_Y + 72) {

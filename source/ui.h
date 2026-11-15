@@ -22,12 +22,16 @@
 #define UI_BTN_R_X 136
 #define UI_BTN_W 116
 
-// Jerry Isles bottom screen: the toy store replaces Jerry (two shop windows side by side)
-#define UI_TOY_Y 83
+// Jerry Isles bottom screen: the whole screen is the toy store (a 3x2 grid of shop windows, one per toy;
+// the SAVE / PRESTIGE buttons sit on the shop counter at the bottom).
+#define UI_TOY_COLS 3
+#define UI_TOY_W 80
 #define UI_TOY_H 50
-#define UI_TOY_W 112
-#define UI_TOY_X0 8
-#define UI_TOY_X1 136
+#define UI_TOY_X0 4
+#define UI_TOY_PITCH_X 84
+#define UI_TOY_Y0 36
+#define UI_TOY_PITCH_Y 54
+#define UI_TOY_ROWS ((TOY_COUNT + UI_TOY_COLS - 1) / UI_TOY_COLS)
 
 typedef struct {
     const Game *game;
@@ -45,5 +49,6 @@ typedef struct {
 void ui_draw_backgrounds(px *topBg, px *botBg); // static stone textures
 void ui_draw_top(px *fb, const px *bg, const UiView *v);
 void ui_draw_bottom(px *fb, const px *bg, const UiView *v);
+int ui_toy_at(int x, int y); // toy under a touch point, or -1
 
 #endif

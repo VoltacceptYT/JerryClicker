@@ -11,10 +11,10 @@
 #define UPGRADE_COUNT 27
 #define FRENZY_FRAMES (30 * 60)
 
-#define TOY_COUNT 2
+#define TOY_COUNT 6
 #define TOY_MAX 4        // most of each toy you can own
-#define TOY_GROWTH 1.0   // flat price: every ball / shovel costs the same
-enum { TOY_BALL, TOY_SHOVEL };
+#define TOY_GROWTH 1.0   // flat price: every copy of a toy costs the same
+enum { TOY_BALL, TOY_SHOVEL, TOY_MOUSE, TOY_EIGHT, TOY_BALLOON, TOY_DICE };
 
 typedef enum {
     UP_AUTO,

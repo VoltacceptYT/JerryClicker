@@ -37,6 +37,10 @@ const UpgradeDef UPGRADES[UPGRADE_COUNT] = {
 const ToyDef TOYS[TOY_COUNT] = {
     {"beach_ball", "Beach Ball", "Bounces around", 250},
     {"plastic_shovel", "Plastic Shovel", "Builds sandcastles", 500},
+    {"squeaky_mouse", "Squeaky Mouse", "Scurries about", 750},
+    {"magic_8_ball", "Magic 8-Ball", "Heavy, rolls far", 1500},
+    {"balloon_snake", "Balloon Snake", "Floats on the breeze", 3000},
+    {"white_dice", "White Dice", "Roll for initiative!", 6000},
 };
 
 static double frenzy_mult(const Game *g) { return g->frenzyFrames > 0 ? 2.0 : 1.0; }
@@ -245,6 +249,24 @@ typedef struct {
     uint32_t checksum;
 } PreToysBlob;
 
+/* Saves from when there were only two toys (beach ball, plastic shovel). */
+typedef struct {
+    double candies;
+    double perClick;
+    double autoRate;
+    UpgradeState up[UPGRADE_COUNT];
+    int32_t prestigeLevel;
+    double prestigeMult;
+    int32_t toys[2];
+} TwoToysState;
+
+typedef struct {
+    uint32_t magic;
+    uint32_t size;
+    TwoToysState state;
+    uint32_t checksum;
+} TwoToysBlob;
+
 /* Saves from before the Jerryseed/Jerryflower/Dye update held 22 upgrades in this order. */
 #define LEGACY_COUNT 22
 static const char *const LEGACY_IDS[LEGACY_COUNT] = {
@@ -288,6 +310,18 @@ bool game_unpack(Game *g, const uint8_t *in, size_t len) {
         memcpy(&b, in, sizeof(b));
         if (b.checksum != checksum_bytes(&b.state, sizeof(b.state))) return false;
         cur = b.state;
+    } else if (size == sizeof(TwoToysBlob) && len >= sizeof(TwoToysBlob)) {
+        TwoToysBlob b;
+        memcpy(&b, in, sizeof(b));
+        if (b.checksum != checksum_bytes(&b.state, sizeof(b.state))) return false;
+        cur.candies = b.state.candies;
+        cur.perClick = b.state.perClick;
+        cur.autoRate = b.state.autoRate;
+        memcpy(cur.up, b.state.up, sizeof(cur.up));
+        cur.prestigeLevel = b.state.prestigeLevel;
+        cur.prestigeMult = b.state.prestigeMult;
+        cur.toys[0] = b.state.toys[0];
+        cur.toys[1] = b.state.toys[1];
     } else if (size == sizeof(PreToysBlob) && len >= sizeof(PreToysBlob)) {
         PreToysBlob b;
         memcpy(&b, in, sizeof(b));

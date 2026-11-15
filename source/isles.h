@@ -9,7 +9,8 @@
 
 #define ISL_PER 5            // one critter per this many purchases of an upgrade
 #define ISL_MAX_CRITTERS 48  // total on the island (shared fairly between upgrades)
-#define ISL_MAX_BALLS TOY_MAX
+#define ISL_BALL_KINDS 5                  // beach ball, squeaky mouse, 8-ball, balloon snake, white dice
+#define ISL_MAX_BALLS (TOY_MAX * ISL_BALL_KINDS)
 #define ISL_MAX_CASTLES (TOY_MAX * 2)  // each plastic shovel lets two sandcastles stand at once
 
 // Builds the static terrain into bgBuf (SCREEN_W x SCREEN_H) and resets the simulation.
