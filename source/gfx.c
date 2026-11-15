@@ -76,6 +76,17 @@ void gfx_nineslice(Canvas *c, const uint16_t *tex, int x, int y, int w, int h) {
     }
 }
 
+// Stretches a tw x th texture to fill w x h (nearest neighbour, so it stays crisp pixel art).
+void gfx_stretch(Canvas *c, const uint16_t *tex, int tw, int th, int x, int y, int w, int h) {
+    for (int yy = 0; yy < h; yy++) {
+        int sy = yy * th / h;
+        for (int xx = 0; xx < w; xx++) {
+            int sx = xx * tw / w;
+            put(c, x + xx, y + yy, tex[sy * tw + sx] | 0x8000);
+        }
+    }
+}
+
 // 16x16 blit; transparent pixels (bit 15 clear) are skipped. half=1 blends 50% with what is underneath.
 void gfx_blit16(Canvas *c, const uint16_t *tex, int x, int y, int half) {
     for (int yy = 0; yy < 16; yy++) {

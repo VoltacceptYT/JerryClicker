@@ -266,7 +266,11 @@ static void claim_golden(void) {
 static void buy_toy(int t) {
     char a[48], b[64], c[48];
     toySel = t;
-    if (game_toy_maxed(&game, t)) {
+    if (!game_toy_unlocked(&game, t)) {
+        int need = game_toy_unlock_level(t);
+        snprintf(b, sizeof b, "Prestige %d time%s", need, need == 1 ? "" : "s");
+        set_msg("Toy locked!", b, 90);
+    } else if (game_toy_maxed(&game, t)) {
         snprintf(a, sizeof a, "%s", TOYS[t].name);
         set_msg(a, "You own the max!", 90);
     } else if (!game_can_buy_toy(&game, t)) {

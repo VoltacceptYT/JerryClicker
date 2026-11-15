@@ -121,14 +121,19 @@ def font_data(size):
     return bot - top, rows, adv
 
 
+GLASS_BOX = (3, 4, 20, 16)  # the pane inside shop/window*.png (17x12); the frame around it is nine-sliced at runtime
+
+
 def shop_textures():
     awning = load(os.path.join(A, "shop", "awning_tile.png"))
     assert awning.size == (12, 13)
     win = load(os.path.join(A, "shop", "window.png"))
+    dark = load(os.path.join(A, "shop", "window_dark.png"))
+    assert win.size == dark.size == (23, 20)
     outline, wood = win.getpixel((0, 5))[:3], win.getpixel((1, 5))[:3]
     wall = (169, 149, 125, 255)
     seam = (151, 121, 106, 255)
-    glass = win.crop((6, 6, 16, 16))
+    # 3px frame (outline / wood / outline); the middle is left to the glass, which is stretched over it
     frame = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
     for y in range(16):
         for x in range(16):
@@ -136,8 +141,10 @@ def shop_textures():
             if d == 0: c = outline + (255,)
             elif d == 1: c = wood + (255,)
             elif d == 2: c = outline + (255,)
-            else: c = glass.getpixel(((x - 3) % 10, (y - 3) % 10))
+            else: c = win.getpixel((GLASS_BOX[0] + 1, GLASS_BOX[1] + 1))
             frame.putpixel((x, y), c)
+    glass = win.crop(GLASS_BOX)
+    glass_dark = dark.crop(GLASS_BOX)
     wallt = Image.new("RGBA", (16, 16), wall)
     for y in range(16):
         wallt.putpixel((0, y), seam)
@@ -148,7 +155,9 @@ def shop_textures():
     plant = load(os.path.join(A, "shop", "plant.png"))
     plant16 = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
     plant16.paste(plant, (1, 0))
-    return awning, frame, wallt, plant16
+    lock = load(os.path.join(A, "shop", "lock.png"))
+    assert lock.size == (16, 16)
+    return awning, frame, wallt, plant16, glass, glass_dark, lock
 
 
 def make_gfxdata(icons, candy, toys, shovel_small):
@@ -179,9 +188,12 @@ def make_gfxdata(icons, candy, toys, shovel_small):
     for im in icons:
         out.append("  {%s}," % ",".join(str(argb1555(p)) for p in im.getdata()))
     out.append("};")
-    awning, frame, wallt, plant16 = shop_textures()
+    awning, frame, wallt, plant16, glass, glass_dark, lock = shop_textures()
+    gn = glass.width * glass.height
     for name, im, n in (("shop_awning", awning, 156), ("tex_shop_window", frame, 256),
-                        ("tex_shop_wall", wallt, 256), ("shop_plant", plant16, 256)):
+                        ("tex_shop_wall", wallt, 256), ("shop_plant", plant16, 256),
+                        ("tex_shop_glass", glass, gn), ("tex_shop_glass_dark", glass_dark, gn),
+                        ("tex_shop_lock", lock, 256)):
         out.append("const uint16_t %s[%d] = {%s};" % (name, n, ",".join(str(argb1555(p)) for p in im.getdata())))
         hdr.append("extern const uint16_t %s[%d];" % (name, n))
     out.append("const uint16_t toy_rgb[TOY_ICONS][256] = {")
@@ -192,6 +204,7 @@ def make_gfxdata(icons, candy, toys, shovel_small):
     out.append("const uint16_t candy_rgb[256] = {%s};" % ",".join(str(argb1555(p)) for p in candy.getdata()))
     hdr += ["extern const uint16_t icon_rgb[ICON_COUNT][256]; /* 16x16 ARGB1555 */",
             "extern const uint16_t toy_rgb[TOY_ICONS][256]; /* beach ball, shovel, mouse, 8-ball, balloon snake, white dice */",
+            "#define SHOP_GLASS_W %d" % glass.width, "#define SHOP_GLASS_H %d" % glass.height,
             "extern const uint16_t shovel_small_rgb[64]; /* 8x8 shovel carried by building critters */",
             "extern const uint16_t candy_rgb[256];", "#endif"]
     open(os.path.join(ROOT, "source", "gfxdata.c"), "w").write("\n".join(out) + "\n")

@@ -157,7 +157,24 @@ static void toy_window(Canvas *c, const Game *g, int t, bool selected) {
     bool maxed = game_toy_maxed(g, t);
     bool afford = game_can_buy_toy(g, t);
     int x = toy_x(t), y = toy_y(t);
+    bool unlocked = game_toy_unlocked(g, t);
+    // Wooden frame, then the glass stretched (not tiled) over the 3px-framed interior
     gfx_nineslice(c, tex_shop_window, x, y, UI_TOY_W, UI_TOY_H);
+    gfx_stretch(c, unlocked ? tex_shop_glass : tex_shop_glass_dark, SHOP_GLASS_W, SHOP_GLASS_H,
+                x + 3, y + 3, UI_TOY_W - 6, UI_TOY_H - 6);
+
+    if (!unlocked) {
+        // Hidden behind the dark window: just a padlock and what it takes to open it
+        gfx_blit16(c, tex_shop_lock, x + UI_TOY_W / 2 - 8, y + 10, 0);
+        snprintf(a, sizeof a, "PRESTIGE %d", game_toy_unlock_level(t));
+        gfx_text_centered(c, &font10, x + UI_TOY_W / 2, y + 31, a, C_DIM, 1);
+        if (selected) {
+            gfx_frame(c, x - 1, y - 1, UI_TOY_W + 2, UI_TOY_H + 2, C_GOLD);
+            gfx_frame(c, x - 2, y - 2, UI_TOY_W + 4, UI_TOY_H + 4, RGB8(200, 130, 0));
+        }
+        return;
+    }
+
     gfx_text_centered(c, &font10, x + UI_TOY_W / 2, y + 4, toy_label(t), C_WHITE, 1);
 
     blit16_x2(c, toy_rgb[t], x + 6, y + 15);
@@ -218,7 +235,13 @@ static void toy_store_screen(Canvas *c, const Game *g, const UiView *v) {
         snprintf(a, sizeof a, "FRENZY! 2X  %ds", g->frenzyFrames / 60 + 1);
         gfx_text_right(c, &font10, 250, 142, a, C_GOLD, 1);
     }
-    gfx_text_centered(c, &font10, 128, 152, TOYS[v->toySel].effect, C_WHITE, 1);
+    if (game_toy_unlocked(g, v->toySel)) {
+        gfx_text_centered(c, &font10, 128, 152, TOYS[v->toySel].effect, C_WHITE, 1);
+    } else {
+        snprintf(a, sizeof a, "Unlocks after %d prestige%s", game_toy_unlock_level(v->toySel),
+                 game_toy_unlock_level(v->toySel) == 1 ? "" : "s");
+        gfx_text_centered(c, &font10, 128, 152, a, C_WHITE, 1);
+    }
     if (v->saveStatus && v->saveStatus[0]) gfx_text_right(c, &font10, 252, 152, v->saveStatus, C_DIM, 0);
 }
 

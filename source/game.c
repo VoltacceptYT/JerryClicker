@@ -135,8 +135,17 @@ double game_toy_cost(const Game *g, int toy) {
 
 bool game_toy_maxed(const Game *g, int toy) { return g->s.toys[toy] >= TOY_MAX; }
 
+// Toy N unlocks after N prestiges: the Beach Ball is open from the start, the Plastic Shovel after 1 prestige, etc.
+int game_toy_unlock_level(int toy) { return toy; }
+
+// Only prestige unlocks a toy; owning one without having reached its level doesn't count.
+bool game_toy_unlocked(const Game *g, int toy) {
+    if (toy < 0 || toy >= TOY_COUNT) return false;
+    return g->s.prestigeLevel >= game_toy_unlock_level(toy);
+}
+
 bool game_can_buy_toy(const Game *g, int toy) {
-    if (toy < 0 || toy >= TOY_COUNT || game_toy_maxed(g, toy)) return false;
+    if (toy < 0 || toy >= TOY_COUNT || !game_toy_unlocked(g, toy) || game_toy_maxed(g, toy)) return false;
     return g->s.candies >= game_toy_cost(g, toy);
 }
 
@@ -359,6 +368,8 @@ bool game_unpack(Game *g, const uint8_t *in, size_t len) {
     for (int i = 0; i < TOY_COUNT; i++) {
         if (s->toys[i] < 0) return false;
         if (s->toys[i] > TOY_MAX) s->toys[i] = TOY_MAX;
+        // Toys from older saves that haven't been unlocked via prestige are removed.
+        if (s->prestigeLevel < game_toy_unlock_level(i)) s->toys[i] = 0;
     }
     game_init(g);
     g->s = *s;

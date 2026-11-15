@@ -391,7 +391,7 @@ static void step_to(Critter *c, int32_t nx, int32_t ny) {  // slide along walls 
  * simulation, tuned per kind in BALL_KIND[]. Critters kick a toy away from themselves, it arcs through the
  * air, hops off the ground losing some height each time and ricochets off water, palms and rocks. Idle
  * critters sometimes chase one. Beach ball: classic bounce. White dice: critters roll it and the number
- * they rolled (d20) pops up once it lands. Magic 8-ball: heavy,
+ * they rolled (d6) pops up once it lands. Magic 8-ball: heavy,
  * barely bounces, rolls far. Squeaky mouse: scurries about on its own. Balloon snake: floats and drifts.
  * Plastic shovels (Game.toys[TOY_SHOVEL]): up to as many critters as there are shovels walk to a sand
  * patch, dig until a sandcastle stands there, and the castle later crumbles away to make room for more. */
@@ -407,7 +407,7 @@ typedef struct {
     int32_t x, y, z;        // ground position and height, 24.8 fixed point (pixels)
     int16_t vx, vy, vz;     // 8.8 px per frame
     int16_t timer;          // mouse: frames until the next scurry; balloon: frames until the next drift change
-    uint8_t roll, showRoll; // dice: the d20 result of the last throw, and frames left to show it once landed
+    uint8_t roll, showRoll; // dice: the d6 result of the last throw, and frames left to show it once landed
 } Ball;
 
 typedef struct {
@@ -540,7 +540,7 @@ static void kick_ball(Ball *b) {
         b->vx = (int16_t)(dx * sp / d + rr(61) - 30);
         b->vy = (int16_t)(dy * sp / d + rr(61) - 30);
         b->vz = (int16_t)(k->kickUp + rr(k->kickUpRand));
-        if (k->toy == TOY_DICE) { b->roll = (uint8_t)(1 + rr(20)); b->showRoll = 0; }
+        if (k->toy == TOY_DICE) { b->roll = (uint8_t)(1 + rr(6)); b->showRoll = 0; }
         b->cool = 18;
         c->hop = 8;
         return;
@@ -615,11 +615,11 @@ static void update_castle(Castle *k) {
 }
 
 static void sync_toys(const Game *g) {
-    shovelsWanted = g->s.toys[TOY_SHOVEL] > TOY_MAX ? TOY_MAX : g->s.toys[TOY_SHOVEL];
+    shovelsWanted = !game_toy_unlocked(g, TOY_SHOVEL) ? 0 : (g->s.toys[TOY_SHOVEL] > TOY_MAX ? TOY_MAX : g->s.toys[TOY_SHOVEL]);
     ballsWanted = 0;
     // Slot layout: kind k owns balls[k * TOY_MAX .. k * TOY_MAX + TOY_MAX - 1].
     for (int k = 0; k < ISL_BALL_KINDS; k++) {
-        int want = g->s.toys[BALL_KIND[k].toy];
+        int want = game_toy_unlocked(g, BALL_KIND[k].toy) ? g->s.toys[BALL_KIND[k].toy] : 0;
         if (want > TOY_MAX) want = TOY_MAX;
         ballsWanted += want;
         for (int i = 0; i < TOY_MAX; i++) {
@@ -931,7 +931,7 @@ void isles_draw(Canvas *c) {
             if (BALL_KIND[b->kind].toy == TOY_DICE && b->showRoll) {
                 char num[8];
                 snprintf(num, sizeof num, "%d", (int)b->roll);
-                px col = b->roll == 20 ? RGB8(255, 170, 0) : (b->roll == 1 ? RGB8(255, 85, 85) : RGB8(255, 255, 255));
+                px col = b->roll == 6 ? RGB8(255, 170, 0) : (b->roll == 1 ? RGB8(255, 85, 85) : RGB8(255, 255, 255));
                 gfx_text_centered(c, &font10, (int)(b->x >> 8), (int)(b->y >> 8) - 25 - (int)(b->z >> 8), num, col, 1);
             }
         }

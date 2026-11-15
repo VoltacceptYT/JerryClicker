@@ -21,8 +21,13 @@ extern const uint16_t shop_awning[156];
 extern const uint16_t tex_shop_window[256];
 extern const uint16_t tex_shop_wall[256];
 extern const uint16_t shop_plant[256];
+extern const uint16_t tex_shop_glass[204];
+extern const uint16_t tex_shop_glass_dark[204];
+extern const uint16_t tex_shop_lock[256];
 extern const uint16_t icon_rgb[ICON_COUNT][256]; /* 16x16 ARGB1555 */
 extern const uint16_t toy_rgb[TOY_ICONS][256]; /* beach ball, shovel, mouse, 8-ball, balloon snake, white dice */
+#define SHOP_GLASS_W 17
+#define SHOP_GLASS_H 12
 extern const uint16_t shovel_small_rgb[64]; /* 8x8 shovel carried by building critters */
 extern const uint16_t candy_rgb[256];
 #endif

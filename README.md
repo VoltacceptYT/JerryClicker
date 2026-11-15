@@ -21,18 +21,18 @@ The UI uses the original Jerrified Pixels font and the original UI sprites (ston
 Saves go to `JerryClicker.sav` next to the ROM on a flashcart/SD (needs DLDI/FAT). Without storage the game still runs, it just can't save.
 
 ## Toy store
-On the Jerry Isles page the whole bottom screen is the **Jerry Toys** store: a 3x2 grid of shop windows (touch a toy, or D-pad + **A**, to buy it; the SAVE / PRESTIGE buttons sit on the shop counter). You can own up to 4 of each toy and they are kept across prestige.
+On the Jerry Isles page the whole bottom screen is the **Jerry Toys** store: a 3x2 grid of shop windows (touch a toy, or D-pad + **A**, to buy it; the SAVE / PRESTIGE buttons sit on the shop counter). You can own one of each toy and they are kept across prestige. Toys unlock with prestige: the Beach Ball is open from the start, the Plastic Shovel after 1 prestige, the Squeaky Mouse after 2, and so on. A toy is only usable once its prestige level is reached; toys in an older save that aren't unlocked yet are removed on load. Locked toys sit behind a dark window (`assets/shop/window_dark.png`) with a padlock (`assets/shop/lock.png`) and only show the prestige level needed.
 
-| Toy | Price | What it does on the island |
-|---|---|---|
-| Beach Ball | 250 | Bounces around; critters kick it |
-| Plastic Shovel | 500 | Critters build sandcastles |
-| Squeaky Mouse | 750 | Scurries about on its own; critters chase it |
-| Magic 8-Ball | 1.5K | Heavy: barely bounces, rolls a long way |
-| Balloon Snake | 3K | Floats above the island and drifts on the breeze |
-| White Dice | 6K | Critters roll it for D&D: the d20 result pops up when it lands (gold on a 20, red on a 1) |
+| Toy | Price | Unlocks | What it does on the island |
+|---|---|---|---|
+| Beach Ball | 250 | Start | Bounces around; critters kick it |
+| Plastic Shovel | 500 | 1 prestige | Critters build sandcastles |
+| Squeaky Mouse | 750 | 2 prestiges | Scurries about on its own; critters chase it |
+| Magic 8-Ball | 1.5K | 3 prestiges | Heavy: barely bounces, rolls a long way |
+| Balloon Snake | 3K | 4 prestiges | Floats above the island and drifts on the breeze |
+| White Dice | 6K | 5 prestiges | Critters roll it for D&D: the d6 result pops up when it lands (gold on a 6, red on a 1) |
 
-Toy textures: `assets/toys/` (the mouse, 8-ball, balloon snake and white dice come from the Skyblock texture pack). To add another toy, add its PNG, append it to `TOY_IDS` in `tools/convert_assets.py` and to `TOYS[]` / the enum in `source/game.h`+`game.c`, then run the converter.
+Toy textures: `assets/toys/` (the mouse, 8-ball, balloon snake and white dice come from the Skyblock texture pack). The window glass is stretched (not tiled) over the frame's interior. To add another toy, add its PNG, append it to `TOY_IDS` in `tools/convert_assets.py` and to `TOYS[]` / the enum in `source/game.h`+`game.c`, then run the converter.
 
 ## Jerry Isles
 The second top-screen page is a tiled island (autotiled from `assets/island/island_tiles.png`: sea, sand, grass, palms, rocks, shells) filling the whole screen under the header. Every 5 purchases of an upgrade add one wandering critter wearing that upgrade's icon (up to 48 at once, shared fairly between upgrades). Critters stay on land, walk around palms, rocks and the bench, drift toward the parasol and palms, bump into each other, and greet each other (hearts for the same upgrade, a note for different ones); sometimes one follows the other around. They disappear on prestige along with the purchases.

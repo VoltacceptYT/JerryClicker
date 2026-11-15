@@ -12,7 +12,7 @@
 #define FRENZY_FRAMES (30 * 60)
 
 #define TOY_COUNT 6
-#define TOY_MAX 4        // most of each toy you can own
+#define TOY_MAX 1        // most of each toy you can own (one of each)
 #define TOY_GROWTH 1.0   // flat price: every copy of a toy costs the same
 enum { TOY_BALL, TOY_SHOVEL, TOY_MOUSE, TOY_EIGHT, TOY_BALLOON, TOY_DICE };
 
@@ -85,6 +85,8 @@ int game_active_cosmetic(const Game *g); // upgrade index or -1
 
 double game_toy_cost(const Game *g, int toy);
 bool game_toy_maxed(const Game *g, int toy);
+int game_toy_unlock_level(int toy);          // prestige level needed to unlock it (toy 0 = 0, toy 1 = 1, ...)
+bool game_toy_unlocked(const Game *g, int toy);
 bool game_can_buy_toy(const Game *g, int toy);
 bool game_buy_toy(Game *g, int toy);
 

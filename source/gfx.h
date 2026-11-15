@@ -27,6 +27,7 @@ void gfx_bevel_panel(Canvas *c, int x, int y, int w, int h, px fill, px light, p
 void gfx_tile(Canvas *c, const uint16_t *tex16, int x, int y, int w, int h);
 void gfx_nineslice(Canvas *c, const uint16_t *tex16, int x, int y, int w, int h);
 void gfx_blit16(Canvas *c, const uint16_t *tex16, int x, int y, int half);
+void gfx_stretch(Canvas *c, const uint16_t *tex, int tw, int th, int x, int y, int w, int h); // scale tw x th texture to w x h
 
 
 // Text. Supports ASCII 32..126; other characters are drawn as '?'.
